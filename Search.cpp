@@ -20,10 +20,6 @@ using namespace std;
 // static member of the class
 WorkSpace *Model::workSpace = NULL;
 
-float absd(float n) {
-	return (n > 0 ? n : -n);
-}
-
 // loader section
 VectorXf *loadResponseVector(string directory, string column, bool performLog) {
 	struct dirent *dp;
