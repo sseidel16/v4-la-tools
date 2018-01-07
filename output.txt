@@ -1,0 +1,143 @@
+18, 2, 4, 3
+File: "responses/Response.tsv"
+Loaded responses
+Went over 48 columns
+Finished constructing CS Matrix
+Creating Models...
+Duplicate Model!!!
+Duplicate Model!!!
+Top Model (0.817898):
+Model with 2 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.697261 | INTERCEPT
+        -1.0801 | A=1 & B=1
+R-Squared: 0.817898
+Adjusted R-Squared: 0.778876
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Top Model (1):
+Model with 3 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.492946 | INTERCEPT
+       0.491868 | C=2
+      -0.989293 | A=1 & B=1
+R-Squared: 1
+Adjusted R-Squared: 1
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Top Model (1):
+Model with 4 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.492947 | INTERCEPT
+       0.491868 | C=2
+      -0.989293 | A=1 & B=1
+   -2.44538e-07 | A=1 & C=0
+R-Squared: 1
+Adjusted R-Squared: 1
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Duplicate Model!!!
+Top Model (1):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.492947 | INTERCEPT
+       0.491868 | C=2
+      -0.989292 | A=1 & B=1
+   -5.67822e-07 | A=1 & C=0
+   -6.13127e-07 | A=1 & C=1
+R-Squared: 1
+Adjusted R-Squared: 1
+Final Models Ranking: 
+Model 1 (1):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.492947 | INTERCEPT
+       0.491868 | C=2
+      -0.989292 | A=1 & B=1
+   -5.67822e-07 | A=1 & C=0
+   -6.13127e-07 | A=1 & C=1
+R-Squared: 1
+Adjusted R-Squared: 1
+Model 2 (0.955939):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.323187 | INTERCEPT
+       -1.10682 | A=1 & B=1
+        0.35693 | A=1 & C=2
+      -0.134937 | A=1 & D=2
+       0.356931 | B=1 & C=2
+R-Squared: 0.955939
+Adjusted R-Squared: 0.931906
+Model 3 (0.94781):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.256121 | INTERCEPT
+      0.0182175 | A=0
+        -1.0986 | A=1 & B=1
+       0.346129 | A=1 & C=2
+       0.327912 | B=1 & C=2
+R-Squared: 0.94781
+Adjusted R-Squared: 0.919343
+Model 4 (0.943635):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.197826 | INTERCEPT
+     -0.0983734 | A=0
+       0.393494 | A=0 & C=2
+      -0.989293 | A=1 & B=1
+       0.295121 | B=0 & C=2
+R-Squared: 0.943635
+Adjusted R-Squared: 0.912891
+Model 5 (0.939282):
+Model with 5 terms
+    Coefficient | Term
+--------------- | ---------------
+      -0.300998 | INTERCEPT
+      -0.197947 | A=0
+       -1.27122 | A=1 & B=1
+         0.3719 | B=1 & C=2
+       0.299919 | C=2 & D=2
+R-Squared: 0.939282
+Adjusted R-Squared: 0.906163
+0.00447857 to -0.990371
+Columns in CSMatrix: 48

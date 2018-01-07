@@ -1,0 +1,18 @@
+17																							
+Beacon_interval	5	0	102.4ms	204.8ms	409.6ms	1024ms	2048ms																
+Number_of_stations	18	0	25	50	75	100	150	200	250	300	350	400	450	500	750	1000	1250	1500	1750	2000			
+Bitrate_probably_1_MHz	11	0	0	0.1	0.2	0.3	0.4	0.5	0.6	0.7	0.8	0.9	1										
+Station_distribution	2	0	random	circular																			
+Maximum_station_distance_from_the_AP	21	0	5m	50m	100m	150m	200m	250m	300m	350m	400m	450m	500m	550m	600m	650m	700m	750m	800m	850m	900m	950m	1000m
+RAW_grouping_strategy	5	0	MCS	packet_size	TX_time	random	distance																
+Number_of_RAW_groups	19	0	1	2	3	4	5	6	7	8	9	10	12	14	16	18	20	25	30	35	40		
+RAW_group_duration	3	0	uniform	stations	packets																		
+Cross_slot_boundary	2	0	on	off																			
+Number_of_RAW_slots_per_group	10	0	0	0.01	0.025	0.05	0.075	0.1	0.25	0.5	0.75	1											
+Packet_size_distribution	2	0	uniform	gaussian																			
+Minimum_packet_size	16	0	16bytes	32bytes	48bytes	64bytes	80bytes	96bytes	112bytes	128bytes	144bytes	160bytes	176bytes	192bytes	208bytes	224bytes	240bytes	256bytes					
+Maximum_packet_size	16	0	16bytes	32bytes	48bytes	64bytes	80bytes	96bytes	112bytes	128bytes	144bytes	160bytes	176bytes	192bytes	208bytes	224bytes	240bytes	256bytes					
+Packet_arrival_rate_distribution	3	0	uniform_static	gaussian_static	poisson_variable																		
+Minimum_packet_arrival_interval	7	0	1	10	30	60	600	1200	3600														
+Maximum_packet_arrival_interval	7	0	1	10	30	60	600	1200	3600														
+Station_transmission_queue_size	6	0	1packet	10packets	20packets	50packets	100packets	infinite_packets															
