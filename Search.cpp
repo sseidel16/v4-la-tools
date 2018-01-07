@@ -348,7 +348,7 @@ int main(int argc, char **argv) {
 	createModels(response, matrix, 5, 5);
 	
 	cout << endl;
-	cout << "Other Stuff" << endl;
+	cout << "Other Stuff:" << endl;
 	cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 	cout << "Columns in CSMatrix: " << matrix->getCols() << endl;
 	
