@@ -269,7 +269,7 @@ string CSMatrix::getFactorString(FactorSetting setting) {
 	}
 	
 	for (int index = setting.index; index < setting.index + setting.levelsInGroup; index++) {
-		if (index != setting.index) factorString << "&";
+		if (index != setting.index) factorString << "|";
 		factorString << getFactorLevelName(setting.factor_i, index);
 	}
 	
