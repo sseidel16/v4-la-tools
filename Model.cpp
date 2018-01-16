@@ -101,7 +101,7 @@ void Model::printModelFactors() {
 		cout << setw(15) << right << coefVec[term_i++] << " | ";
 		
 		// print out the factor names and level names
-		cout << csMatrix->getColName(termIndex) << endl;
+		cout << csMatrix->getColName(csMatrix->getCol(termIndex)) << endl;
 		
 	}
 	

@@ -341,23 +341,35 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 
 int main(int argc, char **argv) {
 	
-	LocatingArray *array = new LocatingArray("LA.tsv");
-	VectorXf *response = loadResponseVector("responses", "Response", false);
-	FactorData *factorData = new FactorData("Factors.tsv");
-	CSMatrix *matrix = new CSMatrix(array, factorData);
-	createModels(response, matrix, 5, 5);
+	int t = 2;
+	
+	//LocatingArray *array = new LocatingArray("LA_SMALL.tsv");
+	//VectorXf *response = loadResponseVector("responses_SMALL", "Exposure", false);
+	//FactorData *factorData = new FactorData("Factors_SMALL.tsv");
+	LocatingArray *array = new LocatingArray("LA_LARGE.tsv");
+	VectorXf *response = loadResponseVector("responses_LARGE", "Throughput", true);
+	FactorData *factorData = new FactorData("Factors_LARGE.tsv");
+	CSMatrix *matrix = new CSMatrix(array, factorData, t);
+	
+	for (int arg_i = 1; arg_i < argc; arg_i++) {
+		if (strcmp(argv[arg_i], "memchk") == 0) {
+			int exit;
+			cout << "Check memory and press ENTER" << endl;
+			cin >> exit;
+		} else if (strcmp(argv[arg_i], "printcs") == 0) {
+			cout << "CS Matrix:" << endl;
+			matrix->print();
+		} else if (strcmp(argv[arg_i], "analysis") == 0) {
+			createModels(response, matrix, 13, 50);
+		} else if (strcmp(argv[arg_i], "fixla") == 0) {
+			matrix->randomFix(array, t);
+		}
+	}
 	
 	cout << endl;
 	cout << "Other Stuff:" << endl;
 	cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 	cout << "Columns in CSMatrix: " << matrix->getCols() << endl;
-	
-//	matrix->print();
-	
-	if (argc > 1 && strcmp(argv[1], "memchk") == 0) {
-		int exit;
-		cin >> exit;
-	}
 	
 	return 0;
 	

@@ -30,7 +30,7 @@ LocatingArray::LocatingArray(string file) {
 		ifs >> tempData;
 		factorGrouping[factor_i]->grouped = tempData;
 		
-		// load less then factor index
+		// load less than factor index
 		ifs >> tempData;
 		factorGrouping[factor_i]->lessThanFactor = tempData;
 		
