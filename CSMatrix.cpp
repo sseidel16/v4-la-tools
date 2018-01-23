@@ -653,17 +653,19 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 // FUNCTIONS FOR 'fixla'
 
 void CSMatrix::addRow(CSCol **array, long long int &csScore) {
-	int secsMax = 1;
+	// the maximum seconds without finding a better score
+	int secsMax = 2;
 	
+	// total factors in locating array
 	int factors = locatingArray->getFactors();
 	
 	long long int bestScore;
 	long long int newScore;
-	int bestColumnIndex;
-	CSCol *csCol;
+	CSCol *csCol, *bestCol;
 	
 	int cols = getCols();
 	
+	// for backing up the order of array
 	CSCol **backupArray = new CSCol*[cols];
 	
 	// increment rows
@@ -671,18 +673,21 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 	
 	cout << "The matrix now has " << rows << " rows" << endl;
 	
-	// add an element to each column
+	// add a row to each column of the CS matrix
 	for (int col_i = 0; col_i < cols; col_i++) {
 		addRow(array[col_i]);
 	}
 	
-	// add a row to locating array
+	// allocate memory for new row of locating array
 	char *levelRow = new char[factors];
-	bool *finalized = new bool[factors];
 	char *oldLevelRow = new char[factors];
 	char *newLevelRow = new char[factors];
 	char *bestLevelRow = new char[factors];
 	
+	// track if factors of new row are finalized
+	bool *finalized = new bool[factors];
+	
+	// add a random row non-finalized to locating array
 	locatingArray->addLevelRow(levelRow);
 	for (int factor_i = 0; factor_i < factors; factor_i++) {
 		finalized[factor_i] = false;
@@ -690,24 +695,29 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 		levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
 	}
 	
+	// change the columns of the CS matrix affected by the factors
 	for (int factor_i = 0; factor_i < factors; factor_i++) {
 		repopulateColumns(factor_i, rows - 1, 1);
 	}
+	
+	// smartly sort the array and score it
 	smartSort(array, rows - 1);
 	csScore = getArrayScore(array);
 	
 	cout << "Score after random non-finalized row: " << csScore << endl;
 	
-	// continue adding columns while CS score increases
+	// used to track duplicate columns in CS matrix
 	bool duplicate = false;
 	bool lastPairMatched = false;
-	bool noDuplicates = true;
+	
+	// continue adding finalizing factors while CS score decreases (improves)
 	while (true) {
 		
 		// find the best column index (with the best score)
-		bestScore = csScore;	// the original best is the current
-		bestColumnIndex = -1;	// no best column yet
+		bestScore = csScore;	// the original best is the original score
+		bestCol = NULL;			// no best column yet
 		
+		// backup the sorted order of the array
 		memcpy(backupArray, array, sizeof(CSCol*) * cols); // backup array
 		
 		// grab initial time
@@ -716,6 +726,7 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 		float elapsedTime;
 		clock_gettime(CLOCK_REALTIME, &start);
 		
+		// go through all columns of CS matrix
 		for (int col_i = 0; col_i < data->size() - 1; col_i++) {
 			
 			// check current time
@@ -728,7 +739,6 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 			
 			// check for duplicate column
 			if (compare(array[col_i], array[col_i + 1], 0, rows) >= 0) {
-				noDuplicates = false;
 				duplicate = true;
 				lastPairMatched = true;
 			} else if (lastPairMatched) {
@@ -738,54 +748,67 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 				duplicate = false;
 			}
 			
-			// retrieve CSCol from workArray
+			// retrieve CSCol (and duplicate) from sorted array
 			csCol = array[col_i];
-			CSCol *csDup = array[col_i + 1];
 			
-			if (duplicate && csCol->factors > 0) {
+			// if duplicate and the column has factors to change (column is not the INTERCEPT)
+			if (duplicate && csCol->dataP[rows - 1] != 1 && csCol->factors > 0) {
 				
+				// grab duplicate column
+				CSCol *csDup = array[col_i + 1];
+				
+				// the goal is to make the last row of csCol be a 1
+				// all factors must be changed, check if this change conflicts with finalized factors
 				bool changeAllowed = true;
 				int factor_i;
+				
+				// go through all relevant factors for this column
 				for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
 					factor_i = csCol->setting[setting_i].factor_i;
 					
+					// backup the factor level
 					oldLevelRow[factor_i] = levelRow[factor_i];
 					
+					// check if finalized yet
 					if (!finalized[factor_i]) {
+						// update factor to match the current column
 						newLevelRow[factor_i] = csCol->setting[setting_i].index +
 							(rand() % csCol->setting[setting_i].levelsInGroup);
 					} else {
-						// ensure this change will actually make this column a 1
+						// ensure this will actually make this column a 1
 						changeAllowed &= (newLevelRow[factor_i] >= csCol->setting[setting_i].index &&
 							newLevelRow[factor_i] < csCol->setting[setting_i].index + csCol->setting[setting_i].levelsInGroup);
 					}
 					
 				}
 				
-				// check if this column is allowed
-				if (csCol->dataP[rows - 1] == -1 && changeAllowed) {
+				// check if this column change is allowed
+				if (changeAllowed) {
 					// CAREFUL!!!
 					// col_i cannot be used after smartSort and before the rollback
 					// because the array is reordered. Use csCol
 					
-					// try making the change
+					// try making the changes and see if the CS score gets smaller
 					newScore = csScore;
 					for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
 						factor_i = csCol->setting[setting_i].factor_i;
 						
 						if (levelRow[factor_i] != newLevelRow[factor_i]) {
-							// update columns and get new score
+							// update columns
 							levelRow[factor_i] = newLevelRow[factor_i];
 							repopulateColumns(factor_i, rows - 1, 1);
 						}
 					}
+					
+					// smart sort and get new score
 					smartSort(array, rows - 1);
 					newScore = getArrayScore(array);
 					
-					// check if we have better score
+					// check if we have a better score
 					if (newScore < bestScore) {
+						// store the better score as the best, and save the column
 						bestScore = newScore;
-						bestColumnIndex = col_i;
+						bestCol = csCol;
 
 						for (int factor_i = 0; factor_i < factors; factor_i++) {
 							bestLevelRow[factor_i] = newLevelRow[factor_i];
@@ -810,15 +833,14 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 			}
 		}
 		
+		// check if we found a better score
 		if (bestScore < csScore) {
 			cout << "Found better score! " << bestScore << endl;
-			// retrieve CSCol from column array
-			csCol = array[bestColumnIndex];
 			
-			// try making the change
+			// make the change to improve the score
 			int factor_i;
-			for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
-				factor_i = csCol->setting[setting_i].factor_i;
+			for (int setting_i = 0; setting_i < bestCol->factors; setting_i++) {
+				factor_i = bestCol->setting[setting_i].factor_i;
 				
 				if (bestLevelRow[factor_i] != levelRow[factor_i]) {
 					// update columns and get new score
@@ -829,6 +851,8 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 				// finalize the changes
 				finalized[factor_i] = true;
 			}
+			
+			// do a final smart sort and finalize the changed factors
 			smartSort(array, rows - 1);
 			csScore = getArrayScore(array);
 			
@@ -871,24 +895,4 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 	squaredSum += streak * streak;
 	
 	return (squaredSum - data->size());
-}
-
-int CSMatrix::getDuplicateCount(CSCol **array, int col_i) {
-	int count = 1;
-	
-	// move left as needed
-	for (int tempCol_i = col_i; tempCol_i > 0; tempCol_i--) {
-		if (compare(array[tempCol_i - 1], array[tempCol_i], 0, rows) != 0) break;
-		
-		count++;
-	}
-	
-	// move right as needed
-	for (int tempCol_i = col_i; tempCol_i < data->size() - 1; tempCol_i++) {
-		if (compare(array[tempCol_i], array[tempCol_i + 1], 0, rows) != 0) break;
-		
-		count++;
-	}
-	
-	return count;
 }

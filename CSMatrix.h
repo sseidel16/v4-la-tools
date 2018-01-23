@@ -90,7 +90,6 @@ private:
 	
 	void addRow(CSCol **array, long long int &csScore);
 	long long int getArrayScore(CSCol **array);
-	int getDuplicateCount(CSCol **array, int col_i);
 	
 public:
 	CSMatrix(LocatingArray *locatingArray, FactorData *factorData);
