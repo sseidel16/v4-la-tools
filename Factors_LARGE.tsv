@@ -1,0 +1,76 @@
+75																							
+TCP_windowInit_	2	0	2	5																			
+TCP_tcpip_base_hdr_size_	2	0	20	40																			
+TCP_overhead_	2	0	0	0.01																			
+TCP_control_increase_	2	0	0	1																			
+TCP_srtt_init_	2	0	0	1																			
+TCP_rttvar_init_	2	0	0	12																			
+TCP_rtxcur_init_	2	0	3	6																			
+TCP_T_SRTT_BITS_	2	0	1	3																			
+TCP_TRTTVAR_BITS_	2	0	2	4																			
+TCP_RTTvar_exp_	2	0	2	4																			
+TCP_tcpTick_	2	0	0.01	0.1																			
+TCP_ts_resetRTO_	2	0	FALSE	TRUE																			
+TCP_updated_rttvar_	2	0	FALSE	TRUE																			
+TCP_precisionReduce_	2	0	FALSE	TRUE																			
+TCP_numdupacksFrac_	2	0	-1	10																			
+TCP_noFastRetrans_	2	0	FALSE	TRUE																			
+TCP_slow_start_restart_	2	0	FALSE	TRUE																			
+AODV_TTL_START_	2	0	1	5																			
+ErrorModel_ranvar_	2	0	Uniform	Exponential																			
+Queue_interleave_	2	0	FALSE	TRUE																			
+Queue_acksfirst_	2	0	FALSE	TRUE																			
+Queue_ackfromfront_	2	0	FALSE	TRUE																			
+Queue_DT_drop_front_	2	0	FALSE	TRUE																			
+Queue_DT_summarystats_	2	0	FALSE	TRUE																			
+Queue_DT_queue_in_bytes_	2	0	FALSE	TRUE																			
+MAC_ScanType_	2	0	PASSIVE	ACTIVE																			
+PLPC_Preamble_	2	0	72	144																			
+ErrorModel_unit_	2	0	pkt	bit																			
+TCP_numdupacks_	3	1	2	3	4									2	3	4							
+TCP_maxburst_	3	1	0	3	4									0	3	4							
+TCP_decrease_num_	3	1	0.5	1	2									0.5	1	2							
+TCP_increase_num_	3	1	0.5	1	2									0.5	1	2							
+AODV_TTL_THRESHOLD_	3	1	3	7	15									3	7	15							
+MAC_RTSThreshold_	3	1	0	1500	3000									0	1500	3000							
+ErrorModel_rate_	3	1	0.0000001	0.000001	0.00001									0.0000001	0.000001	0.00001							
+Propagation_	3	0	TwoRayGround	FreeSpace	Shadowing																		
+AODV_TTL_INCREMENT_	3	1	1	2	3									1	2	3							
+RWP_Scenario_Ratio_	4	1	1	2	3	4								1	2	3	4						
+AODV_HELLO_INTERVAL_	4	1	0.1	0.5	1	10								0.1	0.5	1	10						
+MAC_Min_Max_ChannelTime_	4	1	1	2	3	4								1	2	3	4						
+PHY_Wir_bandwidth_	4	1	1000000	2000000	5500000	11000000								1000000	2000000	5500000	11000000						
+PHY_Wir_CPThresh_	4	1	1.59	5.98	6.99	10								1.59	5.98	6.99	10						
+ENER_idlePower_	4	1	0.0001	0.001	0.0055	0.01								0.0001	0.001	0.0055	0.01						
+RWP_Area_	5	1	8	16	24	32	40							8	16	24	32	40					
+AODV_NODE_TRAVERSAL_TIME_	5	1	0.01	0.02	0.03	0.04	0.05							0.01	0.02	0.03	0.04	0.05					
+PHY_Wir_freq_	5	1	868000000	914000000	2412000000	2437000000	2462000000							868000000	914000000	2412000000	2437000000	2462000000					
+LL_delay_	5	1	2us	10us	25us	50us	100us							2	10	25	50	100					
+TCP_window_	6	1	1	5	10	15	20	40						1	5	10	15	20	40				
+TCP_maxcwnd_	6	1	0	1	4	8	16	32						0	1	4	8	16	32				
+TCP_min_RTO_	6	1	0.1	0.2	10	20	30	40						0.1	0.2	10	20	30	40				
+AODV_MY_ROUTE_TIMEOUT_	6	1	2	4	6	8	10	12						2	4	6	8	10	12				
+MAC_802_11_SlotTime_	6	1	0.000005	0.00001	0.000015	0.00002	0.000025	0.00003						0.000005	0.00001	0.000015	0.00002	0.000025	0.00003				
+MAC_BeaconInterval_	6	1	0.01	0.05	0.1	0.2	0.5	1						0.01	0.05	0.1	0.2	0.5	1				
+MAC_ProbeDelay_	6	1	0.00001	0.00005	0.0001	0.0002	0.0005	0.001						0.00001	0.00005	0.0001	0.0002	0.0005	0.001				
+MAC_ChannelTime_	6	1	0.012	0.06	0.12	0.24	0.6	1.2						0.012	0.06	0.12	0.24	0.6	1.2				
+ENER_transitionTime_	6	1	0.0001	0.0005	0.001	0.005	0.01	0.05						0.0001	0.0005	0.001	0.005	0.01	0.05				
+ErrorModel_FECstrength_	6	1	1	2	3	4	5	6						1	2	3	4	5	6				
+RWP_Node_pause_time_	7	1	0	1	5	10	15	20	30					0	1	5	10	15	20	30			
+ENER_sleepPower_	7	1	0.001	0.002	0.003	0.004	0.005	0.01	0.015					0.001	0.002	0.003	0.004	0.005	0.01	0.015			
+PHY_Wir_L_	7	1	1	1.5	2	2.5	3	3.5	4					1	1.5	2	2.5	3	3.5	4			
+ENER_txPower_	7	1	0.01	0.02	0.03	0.04	0.05	0.06	0.07					0.01	0.02	0.03	0.04	0.05	0.06	0.07			
+ENER_rxPower_	7	1	0.1	0.25	0.4	0.55	0.7	0.85	1					0.1	0.25	0.4	0.55	0.7	0.85	1			
+RWP_Nodes_	8	1	36	51	66	81	96	111	126	141				36	51	66	81	96	111	126	141		
+AODV_NETWORK_DIAMETER_	8	1	3	5	7	10	15	20	30	35				3	5	7	10	15	20	30	35		
+ENER_initialEnergy_	8	1	4	7	10	13	16	20	25	50				4	7	10	13	16	20	25	50		
+ENER_transitionPower_	8	1	0.001	0.005	0.01	0.05	0.1	0.15	0.2	0.3				0.001	0.005	0.01	0.05	0.1	0.15	0.2	0.3		
+AODV_ALLOWED_HELLO_LOSS_	9	1	0	1	2	3	4	5	6	7	8			0	1	2	3	4	5	6	7	8	
+ARP_flows_	10	1	1	2	4	6	8	10	12	14	16	18		1	2	4	6	8	10	12	14	16	18
+TCP_packetSize_	10	1	64	128	256	512	768	1024	1280	1536	1792	2048		64	128	256	512	768	1024	1280	1536	1792	2048
+RWP_Node_speed_	10	1	4	8	10	12	14	16	18	20	22	24		4	8	10	12	14	16	18	20	22	24
+AODV_ACTIVE_ROUTE_TIMEOUT_	10	1	1	2	3	4	5	8	10	12	14	16		1	2	3	4	5	8	10	12	14	16
+AODV_RREQ_RETRIES_	10	1	1	2	3	4	5	6	7	8	9	10		1	2	3	4	5	6	7	8	9	10
+Queue_ifqlen_	10	1	5	10	15	20	25	50	75	100	150	200		5	10	15	20	25	50	75	100	150	200
+DSSS_CWMin_CWMax_	10	1	0	1	2	3	4	5	6	7	8	9		0	1	2	3	4	5	6	7	8	9
+PHY_Wir_RXThresh_m_	10	1	25	50	75	100	125	150	175	200	225	250		25	50	75	100	125	150	175	200	225	250

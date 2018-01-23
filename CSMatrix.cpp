@@ -1,9 +1,10 @@
 #include "CSMatrix.h"
 
-// t-way interactions
-CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
+CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 	
 	srand(time(NULL));
+	
+	this->locatingArray = locatingArray;
 	
 	// assign factor data variable for use with grabbing column names
 	this->factorData = factorData;
@@ -13,16 +14,16 @@ CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
 	int sum;
 	
 	// get number of factors in locating array
-	int factors = array->getFactors();
+	int factors = locatingArray->getFactors();
 	
 	// get level counts (how many levels for each factor)
-	GroupingInfo **groupingInfo = array->getGroupingInfo();
+	groupingInfo = locatingArray->getGroupingInfo();
 	
 	// get the level matrix from locating array (this is the main data)
-	char **levelMatrix = array->getLevelMatrix();
+	char **levelMatrix = locatingArray->getLevelMatrix();
 	
 	// a row for every test
-	rows = array->getTests();
+	rows = locatingArray->getTests();
 	
 	// initialize the data column vector
 	data = new vector<CSCol*>;
@@ -46,7 +47,6 @@ CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
 	
 	// Add the INTERCEPT
 	csCol = new CSCol;
-	csCol->data = new float[rows];
 	sum = 0;
 	
 	csCol->factors = 0;
@@ -54,7 +54,8 @@ CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
 	
 	// populate the intercept
 	for (int row_i = 0; row_i < rows; row_i++) {
-		csCol->data[row_i] = 1;
+		addRow(csCol);
+		csCol->dataP[row_i] = 1;
 		sum += 1;
 	}
 	
@@ -87,8 +88,9 @@ CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
 	// initialize 1st level mapping
 	mapping->mapping = new Mapping*[col_i - 1];
 	
-	//cout << "Adding t-way interactions" << endl;
-	addTWayInteractions(csCol, col_i - 1, col_i, t, mapping->mapping, sumOfSquares, groupingInfo, levelMatrix);
+	cout << "Adding t-way interactions" << endl;
+	addTWayInteractions(csCol, col_i - 1, col_i, locatingArray->getT(),
+		mapping->mapping, sumOfSquares, groupingInfo, levelMatrix);
 	
 	cout << "Went over " << col_i << " columns" << endl;
 	
@@ -108,6 +110,11 @@ CSMatrix::CSMatrix(LocatingArray *array, FactorData *factorData, int t) {
 	
 	cout << "Finished constructing CS Matrix" << endl;
 	
+}
+
+void CSMatrix::addRow(CSCol *csCol) {
+	csCol->dataVector.push_back(0);
+	csCol->dataP = &csCol->dataVector[0];
 }
 
 void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int t,
@@ -167,7 +174,9 @@ void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int
 		
 		// create new column for CS Matrix
 		csCol = new CSCol;
-		csCol->data = new float[rows];
+		for (int row_i = 0; row_i < rows; row_i++) {
+			addRow(csCol);
+		}
 		
 		// set the headers from the combining columns
 		csCol->factors = csColA->factors + 1;
@@ -185,7 +194,7 @@ void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int
 		csCol->setting[csColA->factors].levelsInGroup = colsInGroupB;			// set last level if group
 		
 		// populate the actual column data of CS matrix
-		sum = populateColumnData(csCol, levelMatrix);
+		sum = populateColumnData(csCol, levelMatrix, 0, rows);
 		
 		if (csCol->factors > 1) {
 			// push into vector
@@ -205,12 +214,12 @@ void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int
 	
 }
 
-int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix) {
+int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, int row_len) {
 	int sum = 0;
 	
 	// populate every row
 	bool rowData; // start with true, perform AND operation
-	for (int row_i = 0; row_i < rows; row_i++) {
+	for (int row_i = row_top; row_i < row_top + row_len; row_i++) {
 		
 		rowData = true; // start with true, perform AND operation
 		
@@ -225,19 +234,38 @@ int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix) {
 		}
 		
 		// AND operation
-		csCol->data[row_i] = (rowData ? 1 : -1);
+		csCol->dataP[row_i] = (rowData ? 1 : -1);
 		
 		// add to sum of squares
-		sum += csCol->data[row_i] * csCol->data[row_i];
+		sum += csCol->dataP[row_i] * csCol->dataP[row_i];
 	}
 	
 	return sum;
 }
 
-void CSMatrix::randomFix(LocatingArray *array, int t) {
+void CSMatrix::exactFix() {
 	
-	GroupingInfo **groupingInfo = array->getGroupingInfo();
-	char **levelMatrix = array->getLevelMatrix();
+	// create a work array
+	CSCol **array = new CSCol*[data->size()];
+	for (int col_i = 0; col_i < data->size(); col_i++) {
+		array[col_i] = data->at(col_i);
+	}
+	
+	quickSort(array, 0, data->size() - 1, 0, rows);
+	
+	long long int csScore = getArrayScore(array);
+	
+	while (csScore > 0) {
+		addRow(array, csScore);
+	}
+	
+	delete [] array;
+	
+}
+
+void CSMatrix::randomFix() {
+	
+	char **levelMatrix = locatingArray->getLevelMatrix();
 	
 	// check advanced
 	CSCol **matrix = new CSCol*[data->size()];
@@ -247,13 +275,13 @@ void CSMatrix::randomFix(LocatingArray *array, int t) {
 	
 	FactorSetting *settingToResample = NULL;
 	
-	int k = 3;
+	int k = 2;
 	cout << "Checking advanced for " << k << " differences" << endl;
 	
 	long score = checkAdvanced(matrix, k, 0, data->size() - 1, 0, rows, settingToResample);
-	
+	cout << "Score: " << score << endl;
 	int *oldLevels = new int[rows];
-	
+	/*
 	while (true) {
 		
 		int row_i = rand() % rows;
@@ -286,15 +314,24 @@ void CSMatrix::randomFix(LocatingArray *array, int t) {
 		}
 		
 	}
+	*/
 	
+	delete [] oldLevels;
+}
+
+void CSMatrix::repopulateColumns(int setFactor_i, int row_top, int row_len) {
+	
+	int lastCol_i = -1;
+	repopulateColumns(setFactor_i, locatingArray->getFactors() - 1, locatingArray->getT(),
+		mapping, locatingArray->getLevelMatrix(), lastCol_i, row_top, row_len);
 }
 
 void CSMatrix::repopulateColumns(int setFactor_i, int maxFactor_i, int t,
-		Mapping *mapping, GroupingInfo **groupingInfo, char **levelMatrix, int &lastCol_i) {
+		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len) {
 	
 	if (setFactor_i > maxFactor_i && mapping->mappedTo != lastCol_i) {
-//		cout << "Repopulating " << getColName(getCol(mapping->mappedTo)) << ": " << mapping->mappedTo << endl;
-		populateColumnData(data->at(mapping->mappedTo), levelMatrix);
+		populateColumnData(data->at(mapping->mappedTo), levelMatrix, row_top, row_len);
+		
 		lastCol_i = mapping->mappedTo;
 	}
 	
@@ -316,7 +353,7 @@ void CSMatrix::repopulateColumns(int setFactor_i, int maxFactor_i, int t,
 		
 		for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
 			repopulateColumns(setFactor_i, factor_i - 1, t - 1,
-				mapping->mapping[factorLevelMap[factor_i][level_i]], groupingInfo, levelMatrix, lastCol_i);
+				mapping->mapping[factorLevelMap[factor_i][level_i]], levelMatrix, lastCol_i, row_top, row_len);
 		}
 		
 	}
@@ -339,7 +376,7 @@ float CSMatrix::getDistanceToCol(int col_i, float *residuals) {
 	CSCol *csCol = data->at(col_i);
 	
 	for (int row_i = 0; row_i < rows; row_i++) {
-		subtractionResult = csCol->data[row_i] - residuals[row_i];
+		subtractionResult = csCol->dataP[row_i] - residuals[row_i];
 		distanceSum += subtractionResult * subtractionResult;
 	}
 	
@@ -351,7 +388,7 @@ float CSMatrix::getProductWithCol(int col_i, float *residuals) {
 	CSCol *csCol = data->at(col_i);
 	
 	for (int row_i = 0; row_i < rows; row_i++) {
-		dotSum += csCol->data[row_i] * residuals[row_i];
+		dotSum += csCol->dataP[row_i] * residuals[row_i];
 	}
 	
 	return abs(dotSum);
@@ -401,7 +438,6 @@ void CSMatrix::addOneWayInteraction(int factor_i, char level_i, Factor *factor, 
 	
 	// create new column for CS Matrix
 	CSCol *csCol = new CSCol;
-	csCol->data = new float[rows];
 	int sum = 0;
 	
 	// assign the headers
@@ -414,15 +450,16 @@ void CSMatrix::addOneWayInteraction(int factor_i, char level_i, Factor *factor, 
 	
 	// populate every row
 	for (int row_i = 0; row_i < rows; row_i++) {
+		addRow(csCol);
 		
 		// 1 or -1 depending on if the factor levels matched
 		if (level_i == levelMatrix[row_i][factor_i])
-			csCol->data[row_i] = 1;
+			csCol->dataP[row_i] = 1;
 		else
-			csCol->data[row_i] = -1;
+			csCol->dataP[row_i] = -1;
 		
 		// add to sum of squares
-		sum += csCol->data[row_i] * csCol->data[row_i];
+		sum += csCol->dataP[row_i] * csCol->dataP[row_i];
 		
 	}
 	
@@ -442,7 +479,7 @@ void CSMatrix::print() {
 	for (int row_i = 0; row_i < rows; row_i++) {
 		
 		for (int col_i = 0; col_i < getCols(); col_i++) {
-			cout << data->at(col_i)->data[row_i] << "\t";
+			cout << data->at(col_i)->dataP[row_i] << "\t";
 		}
 		
 		cout << endl;
@@ -474,7 +511,26 @@ void CSMatrix::swapColumns(CSCol **array, int col_i1, int col_i2) {
 	array[col_i2] = tempCol;
 }
 
-void CSMatrix::quickSort(CSCol **array, int min, int max, int row_top, int row_len) {	
+// sort the array, given that some rows are already sorted
+void CSMatrix::smartSort(CSCol **array, int sortedRows) {
+	int min, max;
+	min = 0;
+	
+	for (int col_i = 1; col_i < data->size(); col_i++) {
+		// check if the streak ended
+		if (compare(array[col_i - 1], array[col_i], 0, sortedRows) < 0) {
+			max = col_i - 1;
+			if (max - min > 0) quickSort(array, min, max, sortedRows, rows - sortedRows);
+			min = col_i;
+		}
+	}
+	
+	// add the final streak
+	max = data->size() - 1;
+	if (max - min > 0) quickSort(array, min, max, sortedRows, rows - sortedRows);
+}
+
+void CSMatrix::quickSort(CSCol **array, int min, int max, int row_top, int row_len) {
 	if (min == max) return;
 	
 	int tempMin = min;
@@ -511,7 +567,7 @@ void CSMatrix::quickSort(CSCol **array, int min, int max, int row_top, int row_l
 
 int CSMatrix::compare(CSCol *csCol1, CSCol *csCol2, int row_top, int row_len) {
 	int length = row_len * sizeof(float);
-	return memcmp(&csCol1->data[row_top], &csCol2->data[row_top], length);
+	return memcmp(&csCol1->dataP[row_top], &csCol2->dataP[row_top], length);
 }
 
 long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top, int row_len, FactorSetting *&settingToResample) {
@@ -519,9 +575,9 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 	// no more differences to find or only 1 column
 	if (k <= 0 || min >= max) {
 		return 0;
-	} else if (row_len == 0) {
+	} else if (k > row_len) {
 		
-//		cout << "Looking for " << k << " differences, but there are " << row_len << " rows left" << endl;
+		cout << "Looking for " << k << " differences, but there are " << row_len << " rows left" << endl;
 		
 		CSCol *csCol1 = array[min];
 		CSCol *csCol2 = array[max];
@@ -566,8 +622,6 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 		
 		long score = 0;
 		
-//		cout << "Sorting top row" << endl;
-//		cout << "Data size is " << data->size() << endl;
 		quickSort(array, min, max, row_top, 1);
 		
 		int divide;
@@ -596,3 +650,245 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 	}
 }
 
+// FUNCTIONS FOR 'fixla'
+
+void CSMatrix::addRow(CSCol **array, long long int &csScore) {
+	int secsMax = 1;
+	
+	int factors = locatingArray->getFactors();
+	
+	long long int bestScore;
+	long long int newScore;
+	int bestColumnIndex;
+	CSCol *csCol;
+	
+	int cols = getCols();
+	
+	CSCol **backupArray = new CSCol*[cols];
+	
+	// increment rows
+	rows++;
+	
+	cout << "The matrix now has " << rows << " rows" << endl;
+	
+	// add an element to each column
+	for (int col_i = 0; col_i < cols; col_i++) {
+		addRow(array[col_i]);
+	}
+	
+	// add a row to locating array
+	char *levelRow = new char[factors];
+	bool *finalized = new bool[factors];
+	char *oldLevelRow = new char[factors];
+	char *newLevelRow = new char[factors];
+	char *bestLevelRow = new char[factors];
+	
+	locatingArray->addLevelRow(levelRow);
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		finalized[factor_i] = false;
+		
+		levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
+	}
+	
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		repopulateColumns(factor_i, rows - 1, 1);
+	}
+	smartSort(array, rows - 1);
+	csScore = getArrayScore(array);
+	
+	cout << "Score after random non-finalized row: " << csScore << endl;
+	
+	// continue adding columns while CS score increases
+	bool duplicate = false;
+	bool lastPairMatched = false;
+	bool noDuplicates = true;
+	while (true) {
+		
+		// find the best column index (with the best score)
+		bestScore = csScore;	// the original best is the current
+		bestColumnIndex = -1;	// no best column yet
+		
+		memcpy(backupArray, array, sizeof(CSCol*) * cols); // backup array
+		
+		// grab initial time
+		struct timespec start;
+		struct timespec finish;
+		float elapsedTime;
+		clock_gettime(CLOCK_REALTIME, &start);
+		
+		for (int col_i = 0; col_i < data->size() - 1; col_i++) {
+			
+			// check current time
+			clock_gettime(CLOCK_REALTIME, &finish);
+			// get elapsed seconds
+			elapsedTime = (finish.tv_sec - start.tv_sec);
+			// add elapsed nanoseconds
+			elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+			if (elapsedTime > secsMax) break;
+			
+			// check for duplicate column
+			if (compare(array[col_i], array[col_i + 1], 0, rows) >= 0) {
+				noDuplicates = false;
+				duplicate = true;
+				lastPairMatched = true;
+			} else if (lastPairMatched) {
+				duplicate = true;
+				lastPairMatched = false;
+			} else {
+				duplicate = false;
+			}
+			
+			// retrieve CSCol from workArray
+			csCol = array[col_i];
+			CSCol *csDup = array[col_i + 1];
+			
+			if (duplicate && csCol->factors > 0) {
+				
+				bool changeAllowed = true;
+				int factor_i;
+				for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+					factor_i = csCol->setting[setting_i].factor_i;
+					
+					oldLevelRow[factor_i] = levelRow[factor_i];
+					
+					if (!finalized[factor_i]) {
+						newLevelRow[factor_i] = csCol->setting[setting_i].index +
+							(rand() % csCol->setting[setting_i].levelsInGroup);
+					} else {
+						// ensure this change will actually make this column a 1
+						changeAllowed &= (newLevelRow[factor_i] >= csCol->setting[setting_i].index &&
+							newLevelRow[factor_i] < csCol->setting[setting_i].index + csCol->setting[setting_i].levelsInGroup);
+					}
+					
+				}
+				
+				// check if this column is allowed
+				if (csCol->dataP[rows - 1] == -1 && changeAllowed) {
+					// CAREFUL!!!
+					// col_i cannot be used after smartSort and before the rollback
+					// because the array is reordered. Use csCol
+					
+					// try making the change
+					newScore = csScore;
+					for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+						factor_i = csCol->setting[setting_i].factor_i;
+						
+						if (levelRow[factor_i] != newLevelRow[factor_i]) {
+							// update columns and get new score
+							levelRow[factor_i] = newLevelRow[factor_i];
+							repopulateColumns(factor_i, rows - 1, 1);
+						}
+					}
+					smartSort(array, rows - 1);
+					newScore = getArrayScore(array);
+					
+					// check if we have better score
+					if (newScore < bestScore) {
+						bestScore = newScore;
+						bestColumnIndex = col_i;
+
+						for (int factor_i = 0; factor_i < factors; factor_i++) {
+							bestLevelRow[factor_i] = newLevelRow[factor_i];
+						}
+					}
+					
+					// rollback the change
+					for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+						factor_i = csCol->setting[setting_i].factor_i;
+						
+						if (oldLevelRow[factor_i] != levelRow[factor_i]) {
+							// rollback columns and get new score
+							levelRow[factor_i] = oldLevelRow[factor_i];
+							repopulateColumns(factor_i, rows - 1, 1);
+						}
+					}
+					
+					// restore old order
+					memcpy(array, backupArray, sizeof(CSCol*) * data->size());
+					
+				}
+			}
+		}
+		
+		if (bestScore < csScore) {
+			cout << "Found better score! " << bestScore << endl;
+			// retrieve CSCol from column array
+			csCol = array[bestColumnIndex];
+			
+			// try making the change
+			int factor_i;
+			for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+				factor_i = csCol->setting[setting_i].factor_i;
+				
+				if (bestLevelRow[factor_i] != levelRow[factor_i]) {
+					// update columns and get new score
+					levelRow[factor_i] = bestLevelRow[factor_i];
+					repopulateColumns(factor_i, rows - 1, 1);
+				}
+				
+				// finalize the changes
+				finalized[factor_i] = true;
+			}
+			smartSort(array, rows - 1);
+			csScore = getArrayScore(array);
+			
+		} else {
+			break;
+		}
+		
+	}
+	
+	cout << "Score after finalized row: " << csScore << endl;
+	
+	delete[] oldLevelRow;
+	delete[] newLevelRow;
+	delete[] bestLevelRow;
+	delete[] backupArray;
+	delete[] finalized;
+	
+}
+
+long long int CSMatrix::getArrayScore(CSCol **array) {
+	long long int streak = 0;
+	long long int squaredSum = 0;
+	
+	for (int col_i = 0; col_i < data->size() - 1; col_i++) {
+		
+		// increment streak
+		streak++;
+		
+		// check if the streak ended
+		if (compare(array[col_i], array[col_i + 1], 0, rows) < 0) {
+			squaredSum += streak * streak;
+			streak = 0;
+		} else if (compare(array[col_i], array[col_i + 1], 0, rows) > 0) {
+			cout << "Mistake in array" << endl;
+		}
+	}
+	
+	// add the final streak
+	streak++;
+	squaredSum += streak * streak;
+	
+	return (squaredSum - data->size());
+}
+
+int CSMatrix::getDuplicateCount(CSCol **array, int col_i) {
+	int count = 1;
+	
+	// move left as needed
+	for (int tempCol_i = col_i; tempCol_i > 0; tempCol_i--) {
+		if (compare(array[tempCol_i - 1], array[tempCol_i], 0, rows) != 0) break;
+		
+		count++;
+	}
+	
+	// move right as needed
+	for (int tempCol_i = col_i; tempCol_i < data->size() - 1; tempCol_i++) {
+		if (compare(array[tempCol_i], array[tempCol_i + 1], 0, rows) != 0) break;
+		
+		count++;
+	}
+	
+	return count;
+}

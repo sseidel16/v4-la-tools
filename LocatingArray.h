@@ -2,6 +2,7 @@
 #define LOCATINGARRAY_H
 
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -17,13 +18,17 @@ class LocatingArray {
 private:
 	GroupingInfo **factorGrouping;
 	
-	char **levels;	// pointer to array of test levels
+	vector <char*>levels;	// pointer to array of test levels (the main locating array)
 	
 	int tests;		// count of tests in locating array
 	int factors;	// count of factors in locating array
 	
+	int t; // covers t-way interactions
+	
 public:
 	LocatingArray(string file);
+	
+	void addLevelRow(char *levelRow);
 	
 	GroupingInfo **getGroupingInfo();
 	
@@ -31,6 +36,10 @@ public:
 	
 	int getFactors();
 	int getTests();
+	
+	int getT();
+	
+	void writeToFile(string file);
 };
 
 #endif

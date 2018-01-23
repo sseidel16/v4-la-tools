@@ -134,7 +134,7 @@ void Model::leastSquares() {
 		csCol = csMatrix->getCol(pTermIndex->termIndex);
 		// assign initial column A[col_i] to work vector
 		for (int row_i = 0; row_i < tests; row_i++) {
-			workSpace->workVec[row_i] = csCol->data[row_i];
+			workSpace->workVec[row_i] = csCol->dataP[row_i];
 		}
 		
 		// subtract appropriate other vectors
@@ -143,7 +143,7 @@ void Model::leastSquares() {
 			// find the dot product of A[:][col_i] and Q[:][row_i]
 			dotProd = 0;
 			for (int dotrow_i = 0; dotrow_i < tests; dotrow_i++)
-				dotProd += csCol->data[dotrow_i] * workSpace->dataQ[dotrow_i][row_i];
+				dotProd += csCol->dataP[dotrow_i] * workSpace->dataQ[dotrow_i][row_i];
 			
 			// assign the dot product to the R matrix
 			workSpace->dataR[row_i][col_i] = dotProd;
@@ -257,7 +257,7 @@ void Model::leastSquares() {
 	for (int term_i = 0; term_i < terms; term_i++) {
 		csCol = csMatrix->getCol(pTermIndex->termIndex);
 		for (int row_i = 0; row_i < tests; row_i++) {
-			modelResponse[row_i] += csCol->data[row_i] * coefVec[term_i];
+			modelResponse[row_i] += csCol->dataP[row_i] * coefVec[term_i];
 		}
 		pTermIndex = pTermIndex->next;
 	}

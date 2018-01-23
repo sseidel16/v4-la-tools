@@ -32,7 +32,8 @@ struct Mapping {
 class CSCol {
 public:
 	// column data
-	float *data;
+	vector <float>dataVector;
+	float *dataP; // pointer to the 1st vector element
 
 	// number of contributing factors
 	int factors;
@@ -48,6 +49,8 @@ private:
 	int rows;
 	
 	FactorData *factorData;
+	LocatingArray *locatingArray;
+	GroupingInfo **groupingInfo;
 	
 	vector <CSCol*>*data;	// m by n
 	
@@ -64,6 +67,8 @@ private:
 	int **factorLevelMap;
 	Mapping *mapping;
 	
+	void addRow(CSCol *csCol);
+	
 	string getFactorLevelName(int factor_i, int level_i);
 	string getFactorString(FactorSetting setting);
 	
@@ -71,18 +76,24 @@ private:
 	
 	void addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int t,
 		Mapping **mapping, vector <float>&sumOfSquares, GroupingInfo **groupingInfo, char **levelMatrix);
-	int populateColumnData(CSCol *csCol, char **levelMatrix);
+	int populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, int row_len);
+	void repopulateColumns(int setFactor_i, int row_top, int row_len);
 	void repopulateColumns(int setFactor_i, int maxFactor_i, int t,
-		Mapping *mapping, GroupingInfo **groupingInfo, char **levelMatrix, int &lastCol_i);
+		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len);
 	int getColIndex(CSCol *csCol);
 	
 	void swapColumns(CSCol **array, int col_i1, int col_i2);
+	void smartSort(CSCol **array, int sortedRows);
 	void quickSort(CSCol **array, int min, int max, int row_top, int row_len);
 	int compare(CSCol *csCol1, CSCol *csCol2, int row_top, int row_len);
 	long checkAdvanced(CSCol **array, int k, int min, int max, int row_top, int row_len, FactorSetting *&settingToResample);
 	
+	void addRow(CSCol **array, long long int &csScore);
+	long long int getArrayScore(CSCol **array);
+	int getDuplicateCount(CSCol **array, int col_i);
+	
 public:
-	CSMatrix(LocatingArray *array, FactorData *factorData, int t);
+	CSMatrix(LocatingArray *locatingArray, FactorData *factorData);
 	
 	int getRows();
 	int getCols();
@@ -96,7 +107,8 @@ public:
 	
 	void print();
 	
-	void randomFix(LocatingArray *array, int t);
+	void exactFix();
+	void randomFix();
 	
 };
 

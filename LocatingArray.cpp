@@ -12,9 +12,10 @@ LocatingArray::LocatingArray(string file) {
 	ifs >> tests;
 	ifs >> factors;
 	
+	t = 2;
+	
 	cout << tests << ", " << factors << endl;
 	factorGrouping = new GroupingInfo*[factors];
-	levels = new char*[tests];
 	
 	// load the level counts for the factors
 	for (int factor_i = 0; factor_i < factors; factor_i++) {
@@ -51,18 +52,25 @@ LocatingArray::LocatingArray(string file) {
 	
 	// load the tests now
 	for (int test_i = 0; test_i < tests; test_i++) {
-		levels[test_i] = new char[factors];
+		char *levelRow = new char[factors];
 		
 		// now load each factor level for this specific test
 		for (int factor_i = 0; factor_i < factors; factor_i++) {
 			ifs >> tempData;
-			levels[test_i][factor_i] = tempData;
+			levelRow[factor_i] = tempData;
 		}
 		
+		addLevelRow(levelRow);
+		tests--;
 	}
 	
 	ifs.close();
 	
+}
+
+void LocatingArray::addLevelRow(char *levelRow) {
+	levels.push_back(levelRow);
+	tests++;
 }
 
 GroupingInfo **LocatingArray::getGroupingInfo() {
@@ -70,7 +78,7 @@ GroupingInfo **LocatingArray::getGroupingInfo() {
 }
 
 char **LocatingArray::getLevelMatrix() {
-	return levels;
+	return &levels[0];
 }
 
 int LocatingArray::getFactors() {
@@ -79,4 +87,54 @@ int LocatingArray::getFactors() {
 
 int LocatingArray::getTests() {
 	return tests;
+}
+
+int LocatingArray::getT() {
+	return t;
+}
+
+void LocatingArray::writeToFile(string file) {
+	
+	ofstream ofs(file.c_str());
+	
+	// initial tests and factors
+	ofs << tests << "\t" << factors << endl;
+	
+	// write the level counts for the factors
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		ofs << (int)factorGrouping[factor_i]->levels << "\t";
+	}
+	ofs << endl;
+	
+	// write the grouping for the factors
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		// load grouped bool
+		ofs << factorGrouping[factor_i]->grouped << "\t";
+		
+		// load less than factor index
+		ofs << factorGrouping[factor_i]->lessThanFactor << "\t";
+		
+		// check grouping
+		if (factorGrouping[factor_i]->grouped) {
+		
+			for (int level_i = 0; level_i < factorGrouping[factor_i]->levels; level_i++) {
+				// write level group
+				ofs << factorGrouping[factor_i]->levelGroups[level_i] << "\t";
+			}
+		}
+		ofs << endl;
+	}
+	
+	// write the tests now
+	char **levelMatrix = getLevelMatrix();
+	for (int test_i = 0; test_i < tests; test_i++) {
+		// now write each factor level for this specific test
+		for (int factor_i = 0; factor_i < factors; factor_i++) {
+			ofs << (int)levelMatrix[test_i][factor_i] << "\t";
+		}
+		ofs << endl;
+	}
+	
+	ofs.close();
+	
 }

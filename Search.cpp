@@ -161,7 +161,7 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog) {
 	return response;
 }
 
-void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int models_n) {
+void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int models_n, int newModels_n) {
 	cout << "Creating Models..." << endl;
 	Model::setupWorkSpace(response->getLength(), maxTerms);
 	
@@ -213,7 +213,7 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 			}
 			
 			// find the columns with the largest dot products (at most as many as we have models)
-			for (int colsUsed = 0; colsUsed < models_n; colsUsed++) {
+			for (int colsUsed = 0; colsUsed < newModels_n; colsUsed++) {
 				
 				float largestDotProduct = 0;
 				int bestCol_i = -1;
@@ -341,17 +341,26 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 
 int main(int argc, char **argv) {
 	
-	int t = 2;
-	
 	//LocatingArray *array = new LocatingArray("LA_SMALL.tsv");
-	//VectorXf *response = loadResponseVector("responses_SMALL", "Exposure", false);
 	//FactorData *factorData = new FactorData("Factors_SMALL.tsv");
-	LocatingArray *array = new LocatingArray("LA_LARGE.tsv");
-	VectorXf *response = loadResponseVector("responses_LARGE", "Throughput", true);
-	FactorData *factorData = new FactorData("Factors_LARGE.tsv");
-	CSMatrix *matrix = new CSMatrix(array, factorData, t);
+	//VectorXf *response = loadResponseVector("responses_SMALL", "Exposure", false);
+	//LocatingArray *array = new LocatingArray("LA_LARGE.tsv");
+	//FactorData *factorData = new FactorData("Factors_LARGE.tsv");
+	//VectorXf *response = loadResponseVector("responses_LARGE", "Throughput", true);
 	
-	for (int arg_i = 1; arg_i < argc; arg_i++) {
+	// ./Search LA_LARGE.tsv Factors_LARGE.tsv analysis responses_LARGE Throughput 1 13 50 50
+	
+	if (argc < 3) {
+		cout << "Usage: " << argv[0] << " [LocatingArray.tsv] [FactorData.tsv] ..." << endl;
+		return 0;
+	}
+	
+	LocatingArray *array = new LocatingArray(argv[1]);
+	FactorData *factorData = new FactorData(argv[2]);
+	
+	CSMatrix *matrix = new CSMatrix(array, factorData);
+	
+	for (int arg_i = 3; arg_i < argc; arg_i++) {
 		if (strcmp(argv[arg_i], "memchk") == 0) {
 			int exit;
 			cout << "Check memory and press ENTER" << endl;
@@ -360,15 +369,39 @@ int main(int argc, char **argv) {
 			cout << "CS Matrix:" << endl;
 			matrix->print();
 		} else if (strcmp(argv[arg_i], "analysis") == 0) {
-			createModels(response, matrix, 13, 50);
+			if (arg_i + 6 < argc) {
+				bool performLog = atoi(argv[arg_i + 3]);
+				int terms_n = atoi(argv[arg_i + 4]);
+				int models_n = atoi(argv[arg_i + 5]);
+				int newModels_n = atoi(argv[arg_i + 6]);
+				
+				VectorXf *response = loadResponseVector(argv[arg_i + 1], argv[arg_i + 2], performLog);
+				cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
+				
+				createModels(response, matrix, terms_n, models_n, newModels_n);
+				
+				arg_i += 6;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]" << endl;
+				arg_i = argc;
+			}
 		} else if (strcmp(argv[arg_i], "fixla") == 0) {
-			matrix->randomFix(array, t);
+			if (arg_i + 1 < argc) {
+				matrix->exactFix();
+				array->writeToFile(argv[arg_i + 1]);
+				
+				arg_i += 1;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
 		}
 	}
 	
 	cout << endl;
 	cout << "Other Stuff:" << endl;
-	cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 	cout << "Columns in CSMatrix: " << matrix->getCols() << endl;
 	
 	return 0;
