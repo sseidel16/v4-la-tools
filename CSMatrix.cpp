@@ -1,5 +1,8 @@
 #include "CSMatrix.h"
 
+#define ENTRY_A		-1
+#define ENTRY_B		1
+
 CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 	
 	srand(time(NULL));
@@ -234,7 +237,7 @@ int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, 
 		}
 		
 		// AND operation
-		csCol->dataP[row_i] = (rowData ? 1 : -1);
+		csCol->dataP[row_i] = (rowData ? ENTRY_B : ENTRY_A);
 		
 		// add to sum of squares
 		sum += csCol->dataP[row_i] * csCol->dataP[row_i];
@@ -246,87 +249,306 @@ int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, 
 void CSMatrix::exactFix() {
 	
 	// create a work array
-	CSCol **array = new CSCol*[data->size()];
-	for (int col_i = 0; col_i < data->size(); col_i++) {
+	CSCol **array = new CSCol*[getCols()];
+	for (int col_i = 0; col_i < getCols(); col_i++) {
 		array[col_i] = data->at(col_i);
 	}
 	
-	quickSort(array, 0, data->size() - 1, 0, rows);
+	smartSort(array, 0);
 	
 	long long int csScore = getArrayScore(array);
+	cout << "Original LA Score: " << csScore << endl;
 	
 	while (csScore > 0) {
-		addRow(array, csScore);
+		addRowFix(array, csScore);
 	}
 	
-	delete [] array;
+	cout << "Complete LA created with score: " << csScore << endl;
+	
+	delete[] array;
 	
 }
 
 void CSMatrix::randomFix() {
-	
-	char **levelMatrix = locatingArray->getLevelMatrix();
+	//cout << "Checking advanced for " << k << " differences" << endl;
+	//score = checkAdvanced(array, k, 0, getCols() - 1, 0, rows, settingToResample);
+	//cout << "Advanced Elapsed: " << elapsedTime << endl;
+	int k = 2;
+	int chunk = 80;
+	int finalizedRows = rows;
+	int totalRows = (finalizedRows + chunk);
+	int cols = getCols();
 	
 	// check advanced
-	CSCol **matrix = new CSCol*[data->size()];
-	for (int col_i = 0; col_i < data->size(); col_i++) {
-		matrix[col_i] = data->at(col_i);
+	CSCol **array = new CSCol*[cols];
+	for (int col_i = 0; col_i < cols; col_i++) {
+		array[col_i] = data->at(col_i);
 	}
+	
+	Path *path = new Path;
+	path->entryA = NULL;
+	path->entryB = NULL;
+	path->min = 0;
+	path->max = getCols() - 1;
+	
+	list <Path*>pathList;
+	
+	int nPaths = 0;
+	pathSort(array, path, 0, nPaths, &pathList);
+	cout << "nPaths: " << nPaths << " of size " << sizeof(Path) << endl;
+	cout << "Unfinished paths: " << pathList.size() << endl;
+	
+	long long int score = 0;
+	struct timespec start;
+	struct timespec finish;
+	float elapsedTime;
+	
+	// grab initial time
+	clock_gettime(CLOCK_REALTIME, &start);
+	
+	FactorSetting *settingToResample = NULL;
+	pathChecker(array, path, path, 0, k, score, settingToResample);
+	
+	// check current time
+	clock_gettime(CLOCK_REALTIME, &finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	cout << "Elapsed: " << elapsedTime << endl;
+	
+	cout << "Score: " << score << endl;
+	int factors = locatingArray->getFactors();
+	
+	while (score > 0) {
+		while (rows < totalRows) {
+			// allocate memory for new row of locating array
+			char *levelRow = new char[factors];
+			
+			// generate random row
+			for (int factor_i = 0; factor_i < factors; factor_i++) {
+				levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
+			}
+			
+			addRow(array, levelRow);
+		}
+		
+		randomizePaths(array, path, finalizedRows, k, score, &pathList);
+		finalizedRows = rows;
+		
+		chunk -= chunk / 4;
+		totalRows += chunk;
+	}
+	
+}
+
+void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList) {
+	int iters = 1000;
+	int cols = getCols();
+	long long int newScore;
+	int factor_i, nPaths;
+	FactorSetting *settingToResample;
+	char **levelMatrix = locatingArray->getLevelMatrix();
+	
+	// allocate memory for saving old levels of locating array
+	char *oldLevels = new char[rows];
+	
+	// sort paths
+	for (std::list<Path*>::iterator it = pathList->begin(); it != pathList->end(); it++) {
+		nPaths = 0;
+		pathSort(array, *it, row_top, nPaths, NULL);
+	}
+	
+	// run initial checker
+	score = 0;
+	settingToResample = NULL;
+	pathChecker(array, path, path, 0, k, score, settingToResample);
+	cout << "Score: " << score << endl;
+	
+	for (int iter = 0; iter < iters && score > 0; iter++) {
+		
+		struct timespec start;
+		struct timespec finish;
+		float elapsedTime;
+		
+		// get factor to resample
+		factor_i = settingToResample->factor_i;
+		
+		// resample locating array
+		for (int row_i = row_top; row_i < rows; row_i++) {
+			oldLevels[row_i] = levelMatrix[row_i][factor_i];
+			if (rand() % 100 < 100) {
+				levelMatrix[row_i][factor_i] = rand() % groupingInfo[factor_i]->levels;
+			}
+		}
+		
+		// repopulate columns of CS matrix
+		for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+			repopulateColumns(factor_i, level_i, row_top, rows - row_top);
+		}
+		
+		// grab initial time
+		clock_gettime(CLOCK_REALTIME, &start);
+		// sort paths and recheck score
+		for (std::list<Path*>::iterator it = pathList->begin(); it != pathList->end(); it++) {
+			nPaths = 0;
+			pathSort(array, *it, row_top, nPaths, NULL);
+		}
+		// check current time
+		clock_gettime(CLOCK_REALTIME, &finish);
+		// get elapsed seconds
+		elapsedTime = (finish.tv_sec - start.tv_sec);
+		// add elapsed nanoseconds
+		elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+		cout << "Elapsed After Sort: " << elapsedTime << endl;
+		
+		newScore = 0;
+		FactorSetting *newSettingToResample = NULL;
+		
+		// grab initial time
+		clock_gettime(CLOCK_REALTIME, &start);
+		pathChecker(array, path, path, 0, k, newScore, newSettingToResample);
+		// check current time
+		clock_gettime(CLOCK_REALTIME, &finish);
+		// get elapsed seconds
+		elapsedTime = (finish.tv_sec - start.tv_sec);
+		// add elapsed nanoseconds
+		elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+		cout << "Elapsed After Checker: " << elapsedTime << endl;
+		
+		cout << "Rows: " << rows << " Iter: " << iter << ": ";
+		if (newScore <= score) {
+			cout << newScore << ": \t" << score << " \tAccepted " << endl;
+			settingToResample = newSettingToResample;
+			score = newScore;
+		} else {
+			// rollback the change
+			for (int row_i = row_top; row_i < rows; row_i++) {
+				levelMatrix[row_i][factor_i] = oldLevels[row_i];
+			}
+			
+			// repopulate columns of CS matrix
+			for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+				repopulateColumns(factor_i, level_i, row_top, rows - row_top);
+			}
+			
+			cout << score << ": \t" << newScore << " \tRejected" << endl;
+		}
+	}
+	
+	delete[] oldLevels;
+	
+	// perform one last sort and save final unfinished paths to list
+	list <Path*>newPathList(*pathList);
+	pathList->clear();
+	
+	// sort paths and recheck score
+	for (std::list<Path*>::iterator it = newPathList.begin(); it != newPathList.end(); it++) {
+		nPaths = 0;
+		pathSort(array, *it, row_top, nPaths, pathList);
+	}
+	score = 0;
+	settingToResample = NULL;
+	pathChecker(array, path, path, 0, k, score, settingToResample);
+	
+}
+
+void CSMatrix::randomizeRows(CSCol **backupArray, CSCol **array, long long int &csScore, int row_top, int row_len) {
+	int cols = getCols();
+	long long int newCsScore;
+	int factor_i, resampleFactor;
 	
 	FactorSetting *settingToResample = NULL;
 	
-	int k = 2;
-	cout << "Checking advanced for " << k << " differences" << endl;
+	char **levelMatrix = locatingArray->getLevelMatrix();
 	
-	long score = checkAdvanced(matrix, k, 0, data->size() - 1, 0, rows, settingToResample);
-	cout << "Score: " << score << endl;
-	int *oldLevels = new int[rows];
-	/*
-	while (true) {
+	char *oldLevels = new char[rows];
+	
+	smartSort(array, row_top);
+	csScore = getArrayScore(array);
+	
+	cout << "Score: " << csScore << endl;
+	
+	for (int iter = 0; iter < 1000; ) {
 		
-		int row_i = rand() % rows;
-		cout << "Resampling setting: " << getFactorString(*settingToResample) << " row: " << row_i << endl;
+		if (csScore <= 0) break;
 		
-		oldLevels[row_i] = levelMatrix[row_i][settingToResample->factor_i];
-		
-		levelMatrix[row_i][settingToResample->factor_i] =
-			rand() % groupingInfo[settingToResample->factor_i]->levels;
-		
-		int lastCol_i = -1;
-		repopulateColumns(settingToResample->factor_i, array->getFactors() - 1, 2,
-			mapping, groupingInfo, levelMatrix, lastCol_i);
-		
-		long newScore = checkAdvanced(matrix, k, 0, data->size() - 1, 0, rows, settingToResample);
-		
-		if (newScore > score) {
-			cout << "Rollback" << endl;
-			levelMatrix[row_i][settingToResample->factor_i] = oldLevels[row_i];
+		for (int col_i = 0; col_i < cols - 1; col_i++) {
 			
-			int lastCol_i = -1;
-			repopulateColumns(settingToResample->factor_i, array->getFactors() - 1, 2,
-				mapping, groupingInfo, levelMatrix, lastCol_i);
-			
-			score = checkAdvanced(matrix, k, 0, data->size() - 1, 0, rows, settingToResample);
-		} else {
-			score = newScore;
-			
-			cout << "Score updated: " << score << endl;
+			// check if the streak ended
+			if (compare(array[col_i], array[col_i + 1], 0, rows) == 0) {
+				
+				// copy to backup array
+				memcpy(backupArray, array, sizeof(CSCol*) * cols); // backup array
+				
+				while (iter < 1000) {
+					iter++;
+					
+					resampleFactor = rand() % (array[col_i]->factors + array[col_i + 1]->factors);
+					
+					if (resampleFactor < array[col_i]->factors) {
+						factor_i = array[col_i]->setting[resampleFactor].factor_i;
+					} else {
+						factor_i = array[col_i + 1]->setting[resampleFactor - array[col_i]->factors].factor_i;
+					}
+					
+					for (int row_i = row_top; row_i < row_top + row_len; row_i++) {
+						oldLevels[row_i] = levelMatrix[row_i][factor_i];
+						if (rand() % 100 < 100) {
+							levelMatrix[row_i][factor_i] = rand() % groupingInfo[factor_i]->levels;
+						}
+					}
+					
+					for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+						repopulateColumns(factor_i, level_i, row_top, row_len);
+					}
+					
+					smartSort(array, row_top);
+					newCsScore = getArrayScore(array);
+					
+					float likelihood = 10 / pow((double)newCsScore / (double)csScore, 10);
+					cout << "Rows: " << rows << " Iter: " << iter << ": ";
+					if (newCsScore <= csScore) {// || rand() % 100 < likelihood) {
+						cout << newCsScore << ": \t" << csScore << " \tAccepted " << likelihood << "%" << endl;
+						csScore = newCsScore;
+						break;
+					} else {
+						// rollback the change
+						for (int row_i = row_top; row_i < row_top + row_len; row_i++) {
+							levelMatrix[row_i][factor_i] = oldLevels[row_i];
+						}
+						
+						for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+							repopulateColumns(factor_i, level_i, row_top, row_len);
+						}
+						
+						// restore order from backup array
+						memcpy(array, backupArray, sizeof(CSCol*) * cols); // backup array
+						
+						cout << csScore << ": \t" << newCsScore << " \tRejected" << endl;
+					}
+				}
+				
+				break;
+				
+			} else if (compare(array[col_i], array[col_i + 1], 0, rows) > 0) {
+				cout << "Mistake in array" << endl;
+			}
 		}
 		
 	}
-	*/
 	
-	delete [] oldLevels;
+	delete[] oldLevels;
 }
 
-void CSMatrix::repopulateColumns(int setFactor_i, int row_top, int row_len) {
+void CSMatrix::repopulateColumns(int setFactor_i, int setLevel_i, int row_top, int row_len) {
 	
 	int lastCol_i = -1;
-	repopulateColumns(setFactor_i, locatingArray->getFactors() - 1, locatingArray->getT(),
+	repopulateColumns(setFactor_i, setLevel_i, locatingArray->getFactors() - 1, locatingArray->getT(),
 		mapping, locatingArray->getLevelMatrix(), lastCol_i, row_top, row_len);
 }
 
-void CSMatrix::repopulateColumns(int setFactor_i, int maxFactor_i, int t,
+void CSMatrix::repopulateColumns(int setFactor_i, int setLevel_i, int maxFactor_i, int t,
 		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len) {
 	
 	if (setFactor_i > maxFactor_i && mapping->mappedTo != lastCol_i) {
@@ -351,9 +573,14 @@ void CSMatrix::repopulateColumns(int setFactor_i, int maxFactor_i, int t,
 	
 	for (int factor_i = minFactor_i; factor_i <= maxFactor_i; factor_i++) {
 		
-		for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
-			repopulateColumns(setFactor_i, factor_i - 1, t - 1,
-				mapping->mapping[factorLevelMap[factor_i][level_i]], levelMatrix, lastCol_i, row_top, row_len);
+		if (factor_i == setFactor_i) {
+			repopulateColumns(setFactor_i, setLevel_i, factor_i - 1, t - 1,
+				mapping->mapping[factorLevelMap[factor_i][setLevel_i]], levelMatrix, lastCol_i, row_top, row_len);
+		} else {
+			for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+				repopulateColumns(setFactor_i, setLevel_i, factor_i - 1, t - 1,
+					mapping->mapping[factorLevelMap[factor_i][level_i]], levelMatrix, lastCol_i, row_top, row_len);
+			}
 		}
 		
 	}
@@ -513,21 +740,179 @@ void CSMatrix::swapColumns(CSCol **array, int col_i1, int col_i2) {
 
 // sort the array, given that some rows are already sorted
 void CSMatrix::smartSort(CSCol **array, int sortedRows) {
-	int min, max;
-	min = 0;
 	
-	for (int col_i = 1; col_i < data->size(); col_i++) {
+	int streakMin, streakMax;
+	streakMin = 0;
+	
+	for (int col_i = 1; col_i < getCols(); col_i++) {
 		// check if the streak ended
 		if (compare(array[col_i - 1], array[col_i], 0, sortedRows) < 0) {
-			max = col_i - 1;
-			if (max - min > 0) quickSort(array, min, max, sortedRows, rows - sortedRows);
-			min = col_i;
+			streakMax = col_i - 1;
+			if (streakMin < streakMax) {
+				rowSort(array, streakMin, streakMax, sortedRows, rows - sortedRows);
+			}
+			streakMin = col_i;
 		}
 	}
 	
 	// add the final streak
-	max = data->size() - 1;
-	if (max - min > 0) quickSort(array, min, max, sortedRows, rows - sortedRows);
+	streakMax = getCols() - 1;
+	if (streakMin < streakMax) {
+		rowSort(array, streakMin, streakMax, sortedRows, rows - sortedRows);
+	}
+	
+}
+
+void CSMatrix::rowSort(CSCol **array, int min, int max, int row_i, int row_len) {
+	
+	if (min >= max || row_len <= 0) return;
+	
+	int tempMin = min - 1;
+	int tempMax = max + 1;
+	
+	while (true) {
+		while (tempMin < max && array[tempMin + 1]->dataP[row_i] == ENTRY_B) tempMin++;
+		while (tempMax > min && array[tempMax - 1]->dataP[row_i] == ENTRY_A) tempMax--;
+		
+		if (tempMax - 1 > tempMin + 1) {
+			swapColumns(array, tempMin + 1, tempMax - 1);
+		} else {
+			break;
+		}
+	}
+	
+	rowSort(array, min, tempMin, row_i + 1, row_len - 1);
+	rowSort(array, tempMax, max, row_i + 1, row_len - 1);
+	
+}
+
+void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList) {
+	if (path->min == path->max) {
+		deletePath(path->entryA);
+		deletePath(path->entryB);
+		path->entryA = NULL;
+		path->entryB = NULL;
+		return;
+	} else if (row_i >= rows) {
+		// add to list
+		if (pathList != NULL) pathList->push_front(path);
+		
+		return;
+	}
+	
+	int tempMin = path->min - 1;
+	int tempMax = path->max + 1;
+	
+	while (true) {
+		while (tempMin < path->max && array[tempMin + 1]->dataP[row_i] == ENTRY_B) tempMin++;
+		while (tempMax > path->min && array[tempMax - 1]->dataP[row_i] == ENTRY_A) tempMax--;
+		
+		if (tempMax - 1 > tempMin + 1) {
+			swapColumns(array, tempMin + 1, tempMax - 1);
+		} else {
+			break;
+		}
+	}
+	
+	if (path->min <= tempMin) {
+		// allocate memory if none exists
+		if (path->entryA == NULL) {
+			nPaths++;
+			path->entryA = new Path;
+			path->entryA->entryA = NULL;
+			path->entryA->entryB = NULL;
+		}
+		
+		// populate path for entryA
+		path->entryA->min = path->min;
+		path->entryA->max = tempMin;
+		
+		// sort path for entryA
+		pathSort(array, path->entryA, row_i + 1, nPaths, pathList);
+	} else {
+		// delete unnecessary path for entryA
+		deletePath(path->entryA);
+		path->entryA = NULL;
+	}
+	
+	if (tempMax <= path->max) {
+		// allocate memory if none exists
+		if (path->entryB == NULL) {
+			nPaths++;
+			path->entryB = new Path;
+			path->entryB->entryA = NULL;
+			path->entryB->entryB = NULL;
+		}
+		
+		// populate path for entryB
+		path->entryB->min = tempMax;
+		path->entryB->max = path->max;
+		
+		// sort path for entryB
+		pathSort(array, path->entryB, row_i + 1, nPaths, pathList);
+	} else {
+		deletePath(path->entryB);
+		path->entryB = NULL;
+	}
+}
+
+void CSMatrix::deletePath(Path *path) {
+	if (path != NULL) {
+		deletePath(path->entryA);
+		deletePath(path->entryB);
+		delete path;
+	}
+}
+
+void CSMatrix::pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k, long long int &score, FactorSetting *&settingToResample) {
+	if (k == 0 || pathA == NULL || pathB == NULL || pathA->min == pathB->max) {
+		return;
+	} else if (row_i == rows) {
+//		cout << "Issue " << getColName(array[pathA->min]) << " vs " << getColName(array[pathB->max]) << endl;
+		if (pathA == pathB) {
+			score += (long long int)k * ((long long int)(pathA->max - pathA->min + 1) * (long long int)(pathA->max - pathA->min)) / 2;
+		} else {
+			score += (long long int)k * (long long int)(pathA->max - pathA->min + 1) * (long long int)(pathB->max - pathB->min + 1);
+		}
+		
+		// set a setting to resample
+		if (settingToResample == NULL) {
+			int columnToResample;
+			do {
+				columnToResample = pathA->min + (rand() % (pathA->max - pathA->min + 1));
+			} while (array[columnToResample]->factors <= 0);
+			
+			settingToResample = &array[columnToResample]->setting[rand() % array[columnToResample]->factors];
+		}
+		
+		return;
+	}
+	
+	Path *pathAentryA, *pathAentryB, *pathBentryA, *pathBentryB;
+	
+	if (pathA->min == pathA->max) {
+		pathAentryA = (array[pathA->min]->dataP[row_i] == ENTRY_A ? pathA : NULL);
+		pathAentryB = (array[pathA->min]->dataP[row_i] == ENTRY_B ? pathA : NULL);
+	} else {
+		pathAentryA = pathA->entryA;
+		pathAentryB = pathA->entryB;
+	}
+	
+	if (pathB->min == pathB->max) {
+		pathBentryA = (array[pathB->min]->dataP[row_i] == ENTRY_A ? pathB : NULL);
+		pathBentryB = (array[pathB->min]->dataP[row_i] == ENTRY_B ? pathB : NULL);
+	} else {
+		pathBentryA = pathB->entryA;
+		pathBentryB = pathB->entryB;
+	}
+	
+	pathChecker(array, pathAentryA, pathBentryA, row_i + 1, k, score, settingToResample);
+	pathChecker(array, pathAentryB, pathBentryB, row_i + 1, k, score, settingToResample);
+	pathChecker(array, pathAentryA, pathBentryB, row_i + 1, k - 1, score, settingToResample);
+	
+	if (pathA != pathB) {
+		pathChecker(array, pathAentryB, pathBentryA, row_i + 1, k - 1, score, settingToResample);
+	}
 }
 
 void CSMatrix::quickSort(CSCol **array, int min, int max, int row_top, int row_len) {
@@ -577,7 +962,8 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 		return 0;
 	} else if (k > row_len) {
 		
-		cout << "Looking for " << k << " differences, but there are " << row_len << " rows left" << endl;
+//		cout << "Issue " << getColName(array[min]) << " vs " << getColName(array[max]) << endl;
+//		cout << "Looking for " << k << " differences, but there are " << row_len << " rows left " << min << " vs " << max << endl;
 		
 		CSCol *csCol1 = array[min];
 		CSCol *csCol2 = array[max];
@@ -606,23 +992,14 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 				settingToResample = &csColToResample->setting[rand() % csColToResample->factors];
 			}
 		}
-/*
-		cout << "Factor1: " << getColName(csCol1) << endl;
-		cout << "Factor2: " << getColName(csCol2) << endl;
 		
-		for (int row_i = 0; row_i < rows; row_i++) {
-			if (csCol1->data[row_i] != csCol2->data[row_i]) {
-				cout << "Difference at row " << row_i << endl;
-			}
-		}
-*/
 		int cols = max - min + 1;
 		return (long) pow((double) (cols * cols), (double) k);
 	} else {
 		
 		long score = 0;
 		
-		quickSort(array, min, max, row_top, 1);
+		rowSort(array, min, max, row_top, 1);
 		
 		int divide;
 		for (divide = min; divide < max; divide++) {
@@ -635,14 +1012,11 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 				cout << "Integrity issue" << endl;
 			}
 		}
-//		cout << "Not the same at " << divide << endl;
 		
 		// check the left side
 		score += checkAdvanced(array, k, min, divide, row_top + 1, row_len - 1, settingToResample);
-		
 		// check the right side
 		score += checkAdvanced(array, k, divide + 1, max, row_top + 1, row_len - 1, settingToResample);
-		
 		// check both
 		score += checkAdvanced(array, k - 1, min, max, row_top + 1, row_len - 1, settingToResample);
 		
@@ -652,7 +1026,19 @@ long CSMatrix::checkAdvanced(CSCol **array, int k, int min, int max, int row_top
 
 // FUNCTIONS FOR 'fixla'
 
-void CSMatrix::addRow(CSCol **array, long long int &csScore) {
+void CSMatrix::addRow(CSCol **array, char *levelRow) {
+	rows++;
+	
+	locatingArray->addLevelRow(levelRow);
+	
+	// add a row to each column of the CS matrix and populate
+	for (int col_i = 0; col_i < getCols(); col_i++) {
+		addRow(array[col_i]);
+		populateColumnData(array[col_i], locatingArray->getLevelMatrix(), rows - 1, 1);
+	}
+}
+
+void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 	// the maximum seconds without finding a better score
 	int secsMax = 2;
 	
@@ -668,16 +1054,6 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 	// for backing up the order of array
 	CSCol **backupArray = new CSCol*[cols];
 	
-	// increment rows
-	rows++;
-	
-	cout << "The matrix now has " << rows << " rows" << endl;
-	
-	// add a row to each column of the CS matrix
-	for (int col_i = 0; col_i < cols; col_i++) {
-		addRow(array[col_i]);
-	}
-	
 	// allocate memory for new row of locating array
 	char *levelRow = new char[factors];
 	char *oldLevelRow = new char[factors];
@@ -687,18 +1063,16 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 	// track if factors of new row are finalized
 	bool *finalized = new bool[factors];
 	
-	// add a random row non-finalized to locating array
-	locatingArray->addLevelRow(levelRow);
+	// generate random row non-finalized
 	for (int factor_i = 0; factor_i < factors; factor_i++) {
 		finalized[factor_i] = false;
 		
 		levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
 	}
 	
-	// change the columns of the CS matrix affected by the factors
-	for (int factor_i = 0; factor_i < factors; factor_i++) {
-		repopulateColumns(factor_i, rows - 1, 1);
-	}
+	// add the row to locating array
+	addRow(array, levelRow);
+	cout << "The matrix now has " << rows << " rows" << endl;
 	
 	// smartly sort the array and score it
 	smartSort(array, rows - 1);
@@ -727,7 +1101,7 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 		clock_gettime(CLOCK_REALTIME, &start);
 		
 		// go through all columns of CS matrix
-		for (int col_i = 0; col_i < data->size() - 1; col_i++) {
+		for (int col_i = 0; col_i < getCols() - 1; col_i++) {
 			
 			// check current time
 			clock_gettime(CLOCK_REALTIME, &finish);
@@ -796,7 +1170,8 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 						if (levelRow[factor_i] != newLevelRow[factor_i]) {
 							// update columns
 							levelRow[factor_i] = newLevelRow[factor_i];
-							repopulateColumns(factor_i, rows - 1, 1);
+							repopulateColumns(factor_i, oldLevelRow[factor_i], rows - 1, 1);
+							repopulateColumns(factor_i, newLevelRow[factor_i], rows - 1, 1);
 						}
 					}
 					
@@ -822,12 +1197,13 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 						if (oldLevelRow[factor_i] != levelRow[factor_i]) {
 							// rollback columns and get new score
 							levelRow[factor_i] = oldLevelRow[factor_i];
-							repopulateColumns(factor_i, rows - 1, 1);
+							repopulateColumns(factor_i, oldLevelRow[factor_i], rows - 1, 1);
+							repopulateColumns(factor_i, newLevelRow[factor_i], rows - 1, 1);
 						}
 					}
 					
 					// restore old order
-					memcpy(array, backupArray, sizeof(CSCol*) * data->size());
+					memcpy(array, backupArray, sizeof(CSCol*) * getCols());
 					
 				}
 			}
@@ -844,8 +1220,10 @@ void CSMatrix::addRow(CSCol **array, long long int &csScore) {
 				
 				if (bestLevelRow[factor_i] != levelRow[factor_i]) {
 					// update columns and get new score
+					oldLevelRow[factor_i] = levelRow[factor_i];
 					levelRow[factor_i] = bestLevelRow[factor_i];
-					repopulateColumns(factor_i, rows - 1, 1);
+					repopulateColumns(factor_i, oldLevelRow[factor_i], rows - 1, 1);
+					repopulateColumns(factor_i, bestLevelRow[factor_i], rows - 1, 1);
 				}
 				
 				// finalize the changes
@@ -876,7 +1254,7 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 	long long int streak = 0;
 	long long int squaredSum = 0;
 	
-	for (int col_i = 0; col_i < data->size() - 1; col_i++) {
+	for (int col_i = 0; col_i < getCols() - 1; col_i++) {
 		
 		// increment streak
 		streak++;
@@ -894,5 +1272,5 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 	streak++;
 	squaredSum += streak * streak;
 	
-	return (squaredSum - data->size());
+	return (squaredSum - getCols());
 }

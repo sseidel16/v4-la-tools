@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
+#include <list>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -27,6 +28,13 @@ struct FactorSetting {
 struct Mapping {
 	int mappedTo;
 	Mapping **mapping;
+};
+struct Path {
+	int min;
+	int max;
+	
+	Path *entryA;
+	Path *entryB;
 };
 
 class CSCol {
@@ -77,18 +85,25 @@ private:
 	void addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int t,
 		Mapping **mapping, vector <float>&sumOfSquares, GroupingInfo **groupingInfo, char **levelMatrix);
 	int populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, int row_len);
-	void repopulateColumns(int setFactor_i, int row_top, int row_len);
-	void repopulateColumns(int setFactor_i, int maxFactor_i, int t,
+	void randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList);
+	void randomizeRows(CSCol **backupArray, CSCol **array, long long int &csScore, int row_top, int row_len);
+	void repopulateColumns(int setFactor_i, int setLevel_i, int row_top, int row_len);
+	void repopulateColumns(int setFactor_i, int setLevel_i, int maxFactor_i, int t,
 		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len);
 	int getColIndex(CSCol *csCol);
 	
 	void swapColumns(CSCol **array, int col_i1, int col_i2);
 	void smartSort(CSCol **array, int sortedRows);
 	void quickSort(CSCol **array, int min, int max, int row_top, int row_len);
+	void rowSort(CSCol **array, int min, int max, int row_i, int row_len);
+	void pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList);
+	void deletePath(Path *path);
+	void pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k, long long int &score, FactorSetting *&settingToResample);
 	int compare(CSCol *csCol1, CSCol *csCol2, int row_top, int row_len);
 	long checkAdvanced(CSCol **array, int k, int min, int max, int row_top, int row_len, FactorSetting *&settingToResample);
 	
-	void addRow(CSCol **array, long long int &csScore);
+	void addRow(CSCol **array, char *levelRow);
+	void addRowFix(CSCol **array, long long int &csScore);
 	long long int getArrayScore(CSCol **array);
 	
 public:

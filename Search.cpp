@@ -397,6 +397,17 @@ int main(int argc, char **argv) {
 				cout << " [FixedOutputLA.tsv]" << endl;
 				arg_i = argc;
 			}
+		} else if (strcmp(argv[arg_i], "mtfixla") == 0) {
+			if (arg_i + 1 < argc) {
+				matrix->randomFix();
+				array->writeToFile(argv[arg_i + 1]);
+				
+				arg_i += 1;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
 		}
 	}
 	
