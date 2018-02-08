@@ -16,10 +16,24 @@ You can execute it by typing:
 $ ./Search [LocatingArray.tsv] [FactorData.tsv] analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
 
 FIXLA: (NOT tested extensively with groupings but SHOULD work)
-This section fixes broken locating arrays but successively adding more rows.
+This section fixes broken locating arrays by successively adding more rows.
 A score of the array is kept (lower is better, 0 is valid locating array).
 The software will print lower and lower scores until it reaches 0 and the valid locating array will be written to a file.
+Pros: creates a LA by definition
+Cons: the LAs may barely be valid
 $ ./Search [LocatingArray.tsv] [FactorData.tsv] fixla [FixedOutputLA.tsv]
+
+MTFIXLA:
+This section fixes broken locating arrays by adding chunks of rows and randomizing them.
+The randomization follows the Moser-Tardos idea.
+A special variable k specifies how many differences are required for every pair of columns in the CS matrix.
+This then produces stronger LAs.
+
+REORDERROWSLA:
+Reorder rows in LA by contributions.
+Rows at the top of the LA are the ones contributing most.
+Rows at the bottom often have 0 contribution and can be completely removed.
+Under development...
 
 Examples:
 The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well):
