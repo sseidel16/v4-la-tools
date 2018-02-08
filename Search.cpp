@@ -408,6 +408,17 @@ int main(int argc, char **argv) {
 				cout << " [FixedOutputLA.tsv]" << endl;
 				arg_i = argc;
 			}
+		} else if (strcmp(argv[arg_i], "reorderrowsla") == 0) {
+			if (arg_i + 1 < argc) {
+				matrix->reorderRows();
+				array->writeToFile(argv[arg_i + 1]);
+				
+				arg_i += 1;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [ReorderedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
 		}
 	}
 	

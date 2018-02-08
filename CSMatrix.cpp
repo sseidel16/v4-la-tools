@@ -1,7 +1,7 @@
 #include "CSMatrix.h"
 
-#define ENTRY_A		-1
-#define ENTRY_B		1
+#define ENTRY_A		1
+#define ENTRY_B		-1
 
 CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 	
@@ -237,13 +237,94 @@ int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, 
 		}
 		
 		// AND operation
-		csCol->dataP[row_i] = (rowData ? ENTRY_B : ENTRY_A);
+		csCol->dataP[row_i] = (rowData ? ENTRY_A : ENTRY_B);
 		
 		// add to sum of squares
 		sum += csCol->dataP[row_i] * csCol->dataP[row_i];
 	}
 	
 	return sum;
+}
+
+void CSMatrix::reorderRows() {
+	FactorSetting *settingToResample;
+	int k = 2;
+	int nPaths;
+	long long int score;
+	int cols = getCols();
+	
+	// check advanced
+	CSCol **array = new CSCol*[cols];
+	for (int col_i = 0; col_i < cols; col_i++) {
+		array[col_i] = data->at(col_i);
+	}
+	
+	long long int *rowContributions = new long long int[rows];
+	
+	Path *path = new Path;
+	path->entryA = NULL;
+	path->entryB = NULL;
+	path->min = 0;
+	path->max = getCols() - 1;
+	
+	while (true) {
+		nPaths = 0;
+		for (int row_i = 0; row_i < rows; row_i++) rowContributions[row_i] = 0;
+		pathSort(array, path, 0, nPaths, NULL);
+		
+		score = 0;
+		settingToResample = NULL;
+		pathChecker(array, path, path, 0, k, score, settingToResample, rowContributions);
+		
+		cout << "Score: " << score << ": " << getArrayScore(array) << endl;
+		
+		int swaps = 0;
+		while (true) {
+			
+			// find the max contribution out of place
+			int outOrderRow_i = -1;
+			for (int row_i = 1; row_i < rows; row_i++) {
+				if (rowContributions[row_i - 1] < rowContributions[row_i]) {
+					outOrderRow_i = row_i;
+					break;
+				}
+			}
+			
+			if (outOrderRow_i != -1) {
+				int row_i2 = outOrderRow_i;
+				for (int row_i = row_i2 + 1; row_i < rows; row_i++) {
+					if (rowContributions[row_i] >= rowContributions[row_i2]) {
+						row_i2 = row_i;
+					}
+				}
+				
+				int row_i1 = -1;
+				for (int row_i = 0; row_i < rows; row_i++) {
+					if (rowContributions[row_i2] > rowContributions[row_i]) {
+						row_i1 = row_i;
+						break;
+					}
+				}
+				
+				// perform swap if necessary
+				swapRows(array, row_i1, row_i2);
+				long long int tempContribution = rowContributions[row_i1];
+				rowContributions[row_i1] = rowContributions[row_i2];
+				rowContributions[row_i2] = tempContribution;
+				swaps++;
+			} else {
+				break;
+			}
+			
+		}
+		
+		cout << "Swaps: " << swaps << endl;
+		if (swaps == 0) break;
+	}
+	
+	for (int row_i = 0; row_i < rows; row_i++) cout << row_i << "\t" << rowContributions[row_i] << endl;
+	
+	delete rowContributions;
 }
 
 void CSMatrix::exactFix() {
@@ -274,7 +355,7 @@ void CSMatrix::randomFix() {
 	//score = checkAdvanced(array, k, 0, getCols() - 1, 0, rows, settingToResample);
 	//cout << "Advanced Elapsed: " << elapsedTime << endl;
 	int k = 2;
-	int chunk = 80;
+	int chunk = 10;
 	int finalizedRows = rows;
 	int totalRows = (finalizedRows + chunk);
 	int cols = getCols();
@@ -307,7 +388,7 @@ void CSMatrix::randomFix() {
 	clock_gettime(CLOCK_REALTIME, &start);
 	
 	FactorSetting *settingToResample = NULL;
-	pathChecker(array, path, path, 0, k, score, settingToResample);
+	pathChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	
 	// check current time
 	clock_gettime(CLOCK_REALTIME, &finish);
@@ -362,7 +443,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	// run initial checker
 	score = 0;
 	settingToResample = NULL;
-	pathChecker(array, path, path, 0, k, score, settingToResample);
+	pathChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	cout << "Score: " << score << endl;
 	
 	for (int iter = 0; iter < iters && score > 0; iter++) {
@@ -407,7 +488,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		
 		// grab initial time
 		clock_gettime(CLOCK_REALTIME, &start);
-		pathChecker(array, path, path, 0, k, newScore, newSettingToResample);
+		pathChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
 		// check current time
 		clock_gettime(CLOCK_REALTIME, &finish);
 		// get elapsed seconds
@@ -449,7 +530,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	}
 	score = 0;
 	settingToResample = NULL;
-	pathChecker(array, path, path, 0, k, score, settingToResample);
+	pathChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	
 }
 
@@ -738,6 +819,20 @@ void CSMatrix::swapColumns(CSCol **array, int col_i1, int col_i2) {
 	array[col_i2] = tempCol;
 }
 
+void CSMatrix::swapRows(CSCol **array, int row_i1, int row_i2) {
+	float tempData;
+	for (int col_i = 0; col_i < getCols(); col_i++) {
+		tempData = array[col_i]->dataP[row_i1];
+		array[col_i]->dataP[row_i1] = array[col_i]->dataP[row_i2];
+		array[col_i]->dataP[row_i2] = tempData;
+	}
+	
+	char **levelMatrix = locatingArray->getLevelMatrix();
+	char *tempLevel = levelMatrix[row_i1];
+	levelMatrix[row_i1] = levelMatrix[row_i2];
+	levelMatrix[row_i2] = tempLevel;
+}
+
 // sort the array, given that some rows are already sorted
 void CSMatrix::smartSort(CSCol **array, int sortedRows) {
 	
@@ -771,8 +866,8 @@ void CSMatrix::rowSort(CSCol **array, int min, int max, int row_i, int row_len) 
 	int tempMax = max + 1;
 	
 	while (true) {
-		while (tempMin < max && array[tempMin + 1]->dataP[row_i] == ENTRY_B) tempMin++;
-		while (tempMax > min && array[tempMax - 1]->dataP[row_i] == ENTRY_A) tempMax--;
+		while (tempMin < max && array[tempMin + 1]->dataP[row_i] == ENTRY_A) tempMin++;
+		while (tempMax > min && array[tempMax - 1]->dataP[row_i] == ENTRY_B) tempMax--;
 		
 		if (tempMax - 1 > tempMin + 1) {
 			swapColumns(array, tempMin + 1, tempMax - 1);
@@ -804,8 +899,8 @@ void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list 
 	int tempMax = path->max + 1;
 	
 	while (true) {
-		while (tempMin < path->max && array[tempMin + 1]->dataP[row_i] == ENTRY_B) tempMin++;
-		while (tempMax > path->min && array[tempMax - 1]->dataP[row_i] == ENTRY_A) tempMax--;
+		while (tempMin < path->max && array[tempMin + 1]->dataP[row_i] == ENTRY_A) tempMin++;
+		while (tempMax > path->min && array[tempMax - 1]->dataP[row_i] == ENTRY_B) tempMax--;
 		
 		if (tempMax - 1 > tempMin + 1) {
 			swapColumns(array, tempMin + 1, tempMax - 1);
@@ -814,10 +909,18 @@ void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list 
 		}
 	}
 	
+	for (int col_i = path->min; col_i <= tempMin; col_i++) {
+		if (array[col_i]->dataP[row_i] != ENTRY_A) cout << "mistake" << endl;
+	}
+	for (int col_i = tempMax; col_i <= path->max; col_i++) {
+		if (array[col_i]->dataP[row_i] != ENTRY_B) cout << "mistake" << endl;
+	}
+	if (tempMin != tempMax - 1) cout << "mistake" << endl;
+	
 	if (path->min <= tempMin) {
+		nPaths++;
 		// allocate memory if none exists
 		if (path->entryA == NULL) {
-			nPaths++;
 			path->entryA = new Path;
 			path->entryA->entryA = NULL;
 			path->entryA->entryB = NULL;
@@ -836,9 +939,9 @@ void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list 
 	}
 	
 	if (tempMax <= path->max) {
+		nPaths++;
 		// allocate memory if none exists
 		if (path->entryB == NULL) {
-			nPaths++;
 			path->entryB = new Path;
 			path->entryB->entryA = NULL;
 			path->entryB->entryB = NULL;
@@ -864,7 +967,8 @@ void CSMatrix::deletePath(Path *path) {
 	}
 }
 
-void CSMatrix::pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k, long long int &score, FactorSetting *&settingToResample) {
+void CSMatrix::pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
+		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions) {
 	if (k == 0 || pathA == NULL || pathB == NULL || pathA->min == pathB->max) {
 		return;
 	} else if (row_i == rows) {
@@ -906,12 +1010,22 @@ void CSMatrix::pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, i
 		pathBentryB = pathB->entryB;
 	}
 	
-	pathChecker(array, pathAentryA, pathBentryA, row_i + 1, k, score, settingToResample);
-	pathChecker(array, pathAentryB, pathBentryB, row_i + 1, k, score, settingToResample);
-	pathChecker(array, pathAentryA, pathBentryB, row_i + 1, k - 1, score, settingToResample);
+	pathChecker(array, pathAentryA, pathBentryA, row_i + 1, k, score, settingToResample, rowContributions);
+	pathChecker(array, pathAentryB, pathBentryB, row_i + 1, k, score, settingToResample, rowContributions);
+	pathChecker(array, pathAentryA, pathBentryB, row_i + 1, k - 1, score, settingToResample, rowContributions);
+	
+	// add row contributions
+	if (rowContributions != NULL && pathAentryA != NULL && pathBentryB != NULL) {
+		rowContributions[row_i] += (pathAentryA->max - pathAentryA->min + 1) * (pathBentryB->max - pathBentryB->min + 1);
+	}
 	
 	if (pathA != pathB) {
-		pathChecker(array, pathAentryB, pathBentryA, row_i + 1, k - 1, score, settingToResample);
+		pathChecker(array, pathAentryB, pathBentryA, row_i + 1, k - 1, score, settingToResample, rowContributions);
+		
+		// add row contributions
+		if (rowContributions != NULL && pathAentryB != NULL && pathBentryA != NULL) {
+			rowContributions[row_i] += (pathAentryB->max - pathAentryB->min + 1) * (pathBentryA->max - pathBentryA->min + 1);
+		}
 	}
 }
 

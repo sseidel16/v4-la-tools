@@ -93,12 +93,14 @@ private:
 	int getColIndex(CSCol *csCol);
 	
 	void swapColumns(CSCol **array, int col_i1, int col_i2);
+	void swapRows(CSCol **array, int row_i1, int row_i2);
 	void smartSort(CSCol **array, int sortedRows);
 	void quickSort(CSCol **array, int min, int max, int row_top, int row_len);
 	void rowSort(CSCol **array, int min, int max, int row_i, int row_len);
 	void pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList);
 	void deletePath(Path *path);
-	void pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k, long long int &score, FactorSetting *&settingToResample);
+	void pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
+		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions);
 	int compare(CSCol *csCol1, CSCol *csCol2, int row_top, int row_len);
 	long checkAdvanced(CSCol **array, int k, int min, int max, int row_top, int row_len, FactorSetting *&settingToResample);
 	
@@ -121,6 +123,7 @@ public:
 	
 	void print();
 	
+	void reorderRows();
 	void exactFix();
 	void randomFix();
 	
