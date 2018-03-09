@@ -29,6 +29,7 @@ public:
 	LocatingArray(string file);
 	
 	void addLevelRow(char *levelRow);
+	char *remLevelRow();
 	
 	GroupingInfo **getGroupingInfo();
 	

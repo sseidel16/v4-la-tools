@@ -398,14 +398,30 @@ int main(int argc, char **argv) {
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "mtfixla") == 0) {
-			if (arg_i + 1 < argc) {
-				matrix->randomFix();
-				array->writeToFile(argv[arg_i + 1]);
+			if (arg_i + 3 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int totalRows = atoi(argv[arg_i + 2]);
 				
-				arg_i += 1;
+				matrix->randomFix(k, totalRows);
+				array->writeToFile(argv[arg_i + 3]);
+				
+				arg_i += 3;
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
-				cout << " [FixedOutputLA.tsv]" << endl;
+				cout << " [k Separation] [Total Rows] [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
+		} else if (strcmp(argv[arg_i], "autofind") == 0) {
+			if (arg_i + 2 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int startRows = atoi(argv[arg_i + 2]);
+				
+				matrix->autoFindRows(k, startRows);
+				
+				arg_i += 2;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [k Separation] [Start Rows]" << endl;
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "reorderrowsla") == 0) {

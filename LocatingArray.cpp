@@ -73,6 +73,13 @@ void LocatingArray::addLevelRow(char *levelRow) {
 	tests++;
 }
 
+char *LocatingArray::remLevelRow() {
+	char *levelRow = levels.back();
+	levels.pop_back();
+	tests--;
+	return levelRow;
+}
+
 GroupingInfo **LocatingArray::getGroupingInfo() {
 	return factorGrouping;
 }

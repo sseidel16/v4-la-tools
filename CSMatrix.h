@@ -76,17 +76,19 @@ private:
 	Mapping *mapping;
 	
 	void addRow(CSCol *csCol);
+	void remRow(CSCol *csCol);
+	void resizeArray(CSCol **array, int newRows);
+	void randomizeArray(CSCol **array);
 	
 	string getFactorLevelName(int factor_i, int level_i);
 	string getFactorString(FactorSetting setting);
 	
-	void addOneWayInteraction(int factor_i, char level_i, Factor *factor, char **levelMatrix, vector <float>&sumOfSquares);
+	void addOneWayInteraction(int factor_i, char level_i, char **levelMatrix, vector <float>&sumOfSquares);
 	
 	void addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int t,
 		Mapping **mapping, vector <float>&sumOfSquares, GroupingInfo **groupingInfo, char **levelMatrix);
 	int populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, int row_len);
-	void randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList);
-	void randomizeRows(CSCol **backupArray, CSCol **array, long long int &csScore, int row_top, int row_len);
+	void randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList, int iters);
 	void repopulateColumns(int setFactor_i, int setLevel_i, int row_top, int row_len);
 	void repopulateColumns(int setFactor_i, int setLevel_i, int maxFactor_i, int t,
 		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len);
@@ -99,12 +101,19 @@ private:
 	void rowSort(CSCol **array, int min, int max, int row_i, int row_len);
 	void pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList);
 	void deletePath(Path *path);
-	void pathChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
+	void pathDAChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
+		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions);
+	void pathLAChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
 		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions);
 	int compare(CSCol *csCol1, CSCol *csCol2, int row_top, int row_len);
+	
+	// LEGACY
 	long checkAdvanced(CSCol **array, int k, int min, int max, int row_top, int row_len, FactorSetting *&settingToResample);
+	void randomizeRows(CSCol **backupArray, CSCol **array, long long int &csScore, int row_top, int row_len);
 	
 	void addRow(CSCol **array, char *levelRow);
+	void remRow(CSCol **array);
+	
 	void addRowFix(CSCol **array, long long int &csScore);
 	long long int getArrayScore(CSCol **array);
 	
@@ -125,7 +134,9 @@ public:
 	
 	void reorderRows();
 	void exactFix();
-	void randomFix();
+	void systematicRandomFix(int k);
+	void randomFix(int k, int totalRows);
+	void autoFindRows(int k, int startRows);
 	
 };
 
