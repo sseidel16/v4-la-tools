@@ -1,0 +1,11 @@
+10							
+Tx_channel	3	0	10	19	26		
+Tx_power	5	0	-4dBm	-2dBm	0dBm	2dBm	4dBm
+CCA_THLD	3	0	-95dBm	-80dBm	-65dBm		
+cycleTime	4	0	33msec	66msec	98msec	131msec	
+CCA_RxMax	4	0	2	3	4	5	
+CCA_TxMax	4	0	4	5	6	7	
+send_interval	3	0	768	1536	2304		
+message_size	3	0	50bytes	75bytes	100bytes		
+Retx_max	5	0	0	1	2	3	4
+INT_DY	5	0	0%	5%	10%	15%	20%
