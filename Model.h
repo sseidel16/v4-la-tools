@@ -3,6 +3,7 @@
 
 #include "CSMatrix.h"
 #include "LocatingArray.h"
+#include "Occurrence.h"
 #include "VectorXf.h"
 
 // QR and least squares workspace
@@ -79,6 +80,12 @@ public:
 	
 	// get the number of terms
 	int getTerms();
+	
+	// count occurrences in model
+	void countOccurrences(Occurrence *occurrence);
+	
+	// check if the model is a duplicate
+	bool isDuplicate(Model *model);
 	
 	// destructor
 	~Model();

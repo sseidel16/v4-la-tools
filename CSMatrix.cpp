@@ -228,6 +228,8 @@ void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int
 		// populate the actual column data of CS matrix
 		sum = populateColumnData(csCol, levelMatrix, 0, rows);
 		
+		// add new CS column to matrix if needed
+		bool colAddedToMatrix = false;
 		if (csCol->factors > 1) {
 			// push into vector
 			data->push_back(csCol);
@@ -235,12 +237,19 @@ void CSMatrix::addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int
 			
 			col_i++;
 			
+			colAddedToMatrix = true;
 		}
 		
 		if (t > 1) {
 			// recursive call
 			addTWayInteractions(csCol, colCMax_i, col_i, t - 1,
 				mapping[colB_i]->mapping, sumOfSquares, groupingInfo, levelMatrix);
+		}
+		
+		// deallocate the column if not added to CS matrix
+		if (!colAddedToMatrix) {
+			delete[] csCol->setting;
+			delete csCol;
 		}
 	}
 	
@@ -407,7 +416,7 @@ void CSMatrix::autoFindRows(int k, int startRows) {
 	Path *path = new Path;
 	path->entryA = NULL;
 	path->entryB = NULL;
-	path->min = 0;
+	path->min = twoWayMin;
 	path->max = getCols() - 1;
 	
 	// add more rows to reach total count
@@ -595,7 +604,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	// run initial checker
 	score = 0;
 	settingToResample = NULL;
-	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	pathDAChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	cout << "Score: " << score << endl;
 	
 	for (int iter = 0; iter < iters && score > 0; iter++) {
@@ -640,7 +649,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		
 		// grab initial time
 		current_utc_time( &start);
-		pathLAChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
+		pathDAChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
 		// check current time
 		current_utc_time( &finish);
 		// get elapsed seconds
@@ -682,7 +691,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	}
 	score = 0;
 	settingToResample = NULL;
-	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	pathDAChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	
 }
 
@@ -953,6 +962,17 @@ void CSMatrix::print() {
 		}
 	}
 	
+}
+
+void CSMatrix::countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude) {
+	if (occurrence->list == NULL) return;
+	
+	for (int setting_i = minSetting_i; setting_i < csCol->factors; setting_i++) {
+		occurrence->list[csCol->setting[setting_i].factor_i].count++;
+		occurrence->list[csCol->setting[setting_i].factor_i].magnitude += abs(magnitude);
+		
+		countOccurrences(csCol, &occurrence->list[csCol->setting[setting_i].factor_i], setting_i + 1, magnitude);
+	}
 }
 
 int CSMatrix::getColIndex(CSCol *csCol) {

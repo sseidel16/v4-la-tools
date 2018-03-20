@@ -13,6 +13,7 @@
 
 #include "FactorData.h"
 #include "LocatingArray.h"
+#include "Occurrence.h"
 #include "VectorXf.h"
 
 using namespace std;
@@ -131,6 +132,8 @@ public:
 	string getColName(CSCol *csCol);
 	
 	void print();
+	
+	void countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude);
 	
 	void reorderRows();
 	void exactFix();

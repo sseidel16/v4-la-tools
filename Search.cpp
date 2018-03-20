@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <list>
 #include <stdlib.h>
 #include <string>
 #include <sstream>
@@ -13,6 +14,7 @@
 #include "FactorData.h"
 #include "Model.h"
 #include "LocatingArray.h"
+#include "Occurrence.h"
 #include "VectorXf.h"
 
 using namespace std;
@@ -161,7 +163,45 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog) {
 	return response;
 }
 
-void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int models_n, int newModels_n) {
+// comparison, not case sensitive.
+bool compareOccurrence(const Occurrence *first, const Occurrence *second) {
+	return (first->count < second->count);
+}
+
+void allocateOccurrences(Occurrence *occurrence, int t, int factors, list<Occurrence*> *occurrenceLists) {
+	
+	// no more factors or interactions to allocate for
+	if (factors == 0 || t == 0) {
+		occurrence->list = NULL;
+		return;
+	}
+	
+	// allocate memory for the next dimension of occurrences
+	occurrence->list = new Occurrence[factors];
+	
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		// initialize occurrence
+		occurrence->list[factor_i].factorList = new int[occurrence->factorList_n + 1];
+		occurrence->list[factor_i].factorList_n = occurrence->factorList_n + 1;
+		occurrence->list[factor_i].count = 0;
+		occurrence->list[factor_i].magnitude = 0;
+		
+		// populate the factor list
+		for (int factorList_i = 0; factorList_i < occurrence->factorList_n; factorList_i++) {
+			occurrence->list[factor_i].factorList[factorList_i] = occurrence->factorList[factorList_i];
+		}
+		occurrence->list[factor_i].factorList[occurrence->factorList_n] = factor_i;
+		
+		// push new occurrence into list
+		occurrenceLists[occurrence->factorList_n].push_back(&occurrence->list[factor_i]);
+		
+		// allocate the next dimension
+		allocateOccurrences(&occurrence->list[factor_i], t - 1, factor_i, occurrenceLists);
+	}
+}
+
+void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *csMatrix, FactorData *factorData,
+					int maxTerms, int models_n, int newModels_n) {
 	cout << "Creating Models..." << endl;
 	Model::setupWorkSpace(response->getLength(), maxTerms);
 	
@@ -251,7 +291,7 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 						// there is extra space (we found a NULL entry), insert immediately
 						modelToReplace = model_i;
 						break;
-					} else if (nextTopModels[model_i]->getRSquared() == model->getRSquared()) {
+					} else if (nextTopModels[model_i]->isDuplicate(model)) {
 						// matching r-squared means same model already added
 						cout << "Duplicate Model!!!" << endl;
 						modelToReplace = -1;
@@ -313,6 +353,15 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 		
 	}
 	
+	// count occurrences
+	Occurrence *occurrence = new Occurrence;
+	occurrence->factorList = new int[0];
+	occurrence->factorList_n = 0;
+	occurrence->count = 0;
+	occurrence->magnitude = 0;
+	list<Occurrence*> *occurrenceLists = new list<Occurrence*>[locatingArray->getT()];
+	allocateOccurrences(occurrence, locatingArray->getT(), locatingArray->getFactors(), occurrenceLists);
+	
 	cout << endl;
 	cout << "Final Models Ranking: " << endl;
 	for (int ranking = 1;; ranking++) {
@@ -330,11 +379,49 @@ void createModels(VectorXf *response, CSMatrix *csMatrix, int maxTerms, int mode
 		if (topModel_i != -1) {
 			cout << "Model " << ranking << " (" << bestRSquared << "):" << endl;
 			topModels[topModel_i]->printModelFactors();
+			cout << endl;
+			
+			topModels[topModel_i]->countOccurrences(occurrence);
 			delete topModels[topModel_i];
 			topModels[topModel_i] = NULL;
 		} else {
 			break;
 		}
+	}
+	
+	// sort number of occurrences and print
+	cout << "Occurrence Counts" << endl;
+	for (int t = 0; t < locatingArray->getT(); t++) {
+		
+		occurrenceLists[t].sort(compareOccurrence);
+		occurrenceLists[t].reverse();
+		
+		// print out the headers
+		cout << setw(10) << right << "Count" << " | " << setw(15) << "Magnitude" << " | " << "Factor Combination" << endl;
+		cout << setw(10) << setfill('-') << "" << " | " <<
+				setw(15) << setfill('-') << "" << " | " <<
+				setw(20) << setfill('-') << "" << setfill(' ') << endl;
+		
+		// print out each count
+		for (std::list<Occurrence*>::iterator it = occurrenceLists[t].begin(); it != occurrenceLists[t].end(); it++) {
+			
+			// only print the count if it has a count
+			if ((*it)->count > 0) {
+				cout << setw(10) << right << (*it)->count << " | ";
+				cout << setw(15) << right << (*it)->magnitude << " | ";
+				
+				// print out the factor combination names
+				for (int factorList_i = 0; factorList_i < (*it)->factorList_n; factorList_i++) {
+					if (factorList_i != 0) cout << " & ";
+					cout << factorData->getFactorName((*it)->factorList[factorList_i]);
+				}
+				cout << endl;
+			}
+			
+		}
+		
+		cout << endl;
+
 	}
 	
 }
@@ -378,7 +465,7 @@ int main(int argc, char **argv) {
 				VectorXf *response = loadResponseVector(argv[arg_i + 1], argv[arg_i + 2], performLog);
 				cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 				
-				createModels(response, matrix, terms_n, models_n, newModels_n);
+				createModels(array, response, matrix, factorData, terms_n, models_n, newModels_n);
 				
 				arg_i += 6;
 			} else {

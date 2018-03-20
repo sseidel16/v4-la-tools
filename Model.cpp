@@ -109,6 +109,7 @@ void Model::printModelFactors() {
 	float adjustedRSquared = 1 - (1 - rSquared) * (tests - 1) / (tests - terms - 2);
 	
 	// print model r-squared
+	if (rSquared == 1) cout << "Perfect Model!!!" << endl;
 	cout << "R-Squared: " << rSquared << endl;
 	cout << "Adjusted R-Squared: " << adjustedRSquared << endl;
 }
@@ -377,6 +378,31 @@ void Model::setupWorkSpace(int rows, int cols) {
 	
 	// allocate memory for work vector
 	workSpace->workVec = new float[rows];
+}
+
+void Model::countOccurrences(Occurrence *occurrence) {
+	// count occurrences for each term
+	int term_i = 0;
+	for (TermIndex *pTermIndex = hTermIndex; pTermIndex != NULL; pTermIndex = pTermIndex->next) {
+		int termIndex = pTermIndex->termIndex;
+		float magnitude = coefVec[term_i++];
+		csMatrix->countOccurrences(csMatrix->getCol(termIndex), occurrence, 0, magnitude);
+	}
+}
+
+bool Model::isDuplicate(Model *model) {
+	// check if all terms match
+	TermIndex *p1TermIndex = hTermIndex;
+	TermIndex *p2TermIndex = model->hTermIndex;
+	
+	while (!(p1TermIndex == NULL && p2TermIndex == NULL)) {
+		if (p1TermIndex->termIndex != p2TermIndex->termIndex) return false;
+		
+		p1TermIndex = p1TermIndex->next;
+		p2TermIndex = p2TermIndex->next;
+	}
+	
+	return true;
 }
 
 Model::~Model() {
