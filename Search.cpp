@@ -5,9 +5,9 @@
 #include <iostream>
 #include <iomanip>
 #include <list>
+#include <sstream>
 #include <stdlib.h>
 #include <string>
-#include <sstream>
 #include <sys/types.h>
 
 #include "CSMatrix.h"
@@ -282,40 +282,44 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				model->addTerm(bestCol_i);
 				model->leastSquares();
 				
-				// find a possible next top model to replace
-				float worstRSquared = 0;
-				int modelToReplace = -1;
+				// check if the model is a duplicate
+				bool isDuplicate = false;
 				for (int model_i = 0; model_i < models_n; model_i++) {
-					
 					if (nextTopModels[model_i] == NULL) {
-						// there is extra space (we found a NULL entry), insert immediately
-						modelToReplace = model_i;
 						break;
 					} else if (nextTopModels[model_i]->isDuplicate(model)) {
-						// matching r-squared means same model already added
 						cout << "Duplicate Model!!!" << endl;
-						modelToReplace = -1;
+						isDuplicate = true;
 						break;
-					} else if (nextTopModels[model_i]->getRSquared() < model->getRSquared() &&
-							(modelToReplace == -1 || nextTopModels[model_i]->getRSquared() < worstRSquared)) {
-						// better r-squared and the model to replace is the worst we have seen
-						modelToReplace = model_i;
-						worstRSquared = nextTopModels[model_i]->getRSquared();
 					}
 				}
 				
-				// replace the model if a better one was found
-				if (modelToReplace != -1) {
-					// make sure we deallocate any older next top model
-					if (nextTopModels[modelToReplace] != NULL) {
-						delete nextTopModels[modelToReplace];
-						nextTopModels[modelToReplace] = NULL;
+				if (!isDuplicate) {
+					// find a possible next top model to replace
+					if (nextTopModels[models_n - 1] == NULL ||
+						nextTopModels[models_n - 1]->getRSquared() < model->getRSquared()) {
+						
+						// make sure we deallocate the older next top model
+						if (nextTopModels[models_n - 1] != NULL) {
+							delete nextTopModels[models_n - 1];
+							nextTopModels[models_n - 1] = NULL;
+						}
+						
+						// insert the new next top model
+						nextTopModels[models_n - 1] = new Model(model);
 					}
 					
-					//cout << "Now we have a model with r-squared: " << model->getRSquared() << endl;
+					// perform swapping to maintain sorted list
+					for (int model_i = models_n - 2; model_i >= 0; model_i--) {
+						if (nextTopModels[model_i] == NULL ||
+							nextTopModels[model_i]->getRSquared() < nextTopModels[model_i + 1]->getRSquared()) {
+							
+							Model *temp = nextTopModels[model_i];
+							nextTopModels[model_i] = nextTopModels[model_i + 1];
+							nextTopModels[model_i + 1] = temp;
+						}
+					}
 					
-					// insert the new next top model
-					nextTopModels[modelToReplace] = new Model(model);
 				}
 				
 				// remove the temporarily added term
@@ -334,19 +338,9 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 		}
 		
 		// find the top model
-		int topModel_i = -1;
-		float bestRSquared = 0;
-		for (int model_i = 0; model_i < models_n; model_i++) {
-			if (topModels[model_i] != NULL &&
-				(topModel_i == -1 || topModels[model_i]->getRSquared() > bestRSquared)) {
-				topModel_i = model_i;
-				bestRSquared = topModels[model_i]->getRSquared();
-			}
-		}
-		
-		if (topModel_i != -1) {
-			cout << "Top Model (" << bestRSquared << "):" << endl;
-			topModels[topModel_i]->printModelFactors();
+		if (topModels[0] != NULL) {
+			cout << "Top Model (" << topModels[0]->getRSquared() << "):" << endl;
+			topModels[0]->printModelFactors();
 		} else {
 			cout << "No Model" << endl;
 		}
@@ -364,26 +358,15 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 	
 	cout << endl;
 	cout << "Final Models Ranking: " << endl;
-	for (int ranking = 1;; ranking++) {
-		// find the top model
-		int topModel_i = -1;
-		float bestRSquared = 0;
-		for (int model_i = 0; model_i < models_n; model_i++) {
-			if (topModels[model_i] != NULL &&
-				(topModel_i == -1 || topModels[model_i]->getRSquared() > bestRSquared)) {
-				topModel_i = model_i;
-				bestRSquared = topModels[model_i]->getRSquared();
-			}
-		}
-		
-		if (topModel_i != -1) {
-			cout << "Model " << ranking << " (" << bestRSquared << "):" << endl;
-			topModels[topModel_i]->printModelFactors();
+	for (int model_i = 0; model_i < models_n; model_i++) {
+		if (topModels[model_i] != NULL) {
+			cout << "Model " << (model_i + 1) << " (" << topModels[model_i]->getRSquared() << "):" << endl;
+			topModels[model_i]->printModelFactors();
 			cout << endl;
 			
-			topModels[topModel_i]->countOccurrences(occurrence);
-			delete topModels[topModel_i];
-			topModels[topModel_i] = NULL;
+			topModels[model_i]->countOccurrences(occurrence);
+			delete topModels[model_i];
+			topModels[model_i] = NULL;
 		} else {
 			break;
 		}
