@@ -23,7 +23,7 @@ private:
 	int tests;		// count of tests in locating array
 	int factors;	// count of factors in locating array
 	
-	int t; // covers t-way interactions
+	int t;			// covers t-way interactions
 	
 public:
 	LocatingArray(string file);

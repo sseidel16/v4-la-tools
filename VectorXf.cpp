@@ -1,8 +1,6 @@
 
 #include "VectorXf.h"
 
-#include <iostream>
-
 using namespace std;
 
 VectorXf::VectorXf(int length) {

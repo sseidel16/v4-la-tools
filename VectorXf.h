@@ -1,6 +1,8 @@
 #ifndef VECTORXF_H
 #define VECTORXF_H
 
+#include <iostream>
+
 class VectorXf {
 	
 	int length;

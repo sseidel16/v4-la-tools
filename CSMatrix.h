@@ -8,7 +8,10 @@
 #include <iostream>
 #include <list>
 #include <sstream>
+#include <stdio.h>
 #include <string>
+#include <sys/time.h>
+#include <time.h>
 #include <vector>
 
 #include "FactorData.h"
