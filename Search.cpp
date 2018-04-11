@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <dirent.h>
 #include <fstream>
@@ -6,7 +7,6 @@
 #include <iomanip>
 #include <list>
 #include <sstream>
-#include <stdlib.h>
 #include <string>
 #include <sys/types.h>
 
@@ -14,6 +14,7 @@
 #include "FactorData.h"
 #include "Model.h"
 #include "LocatingArray.h"
+#include "Noise.h"
 #include "Occurrence.h"
 #include "VectorXf.h"
 
@@ -23,7 +24,7 @@ using namespace std;
 WorkSpace *Model::workSpace = NULL;
 
 // loader section
-VectorXf *loadResponseVector(string directory, string column, bool performLog) {
+VectorXf *loadResponseVector(string directory, string column, bool performLog, Noise *noise) {
 	struct dirent *dp;
 	
 	// open the directory
@@ -144,9 +145,22 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog) {
 	
 	// average the responses
 	data = response->getData();
+	float minResponse = data[0] / responseData[0];
+	float maxResponse = data[0] / responseData[0];
 	for (int row_i = 0; row_i < rows; row_i++) {
 		data[row_i] /= responseData[row_i];
 		//cout << data[row_i] << " from " << responseData[row_i] << " responses " << endl;
+		
+		if (data[row_i] < minResponse) minResponse = data[row_i];
+		if (data[row_i] > maxResponse) maxResponse = data[row_i];
+	}
+	
+	// add noise as necessary
+	float range = maxResponse - minResponse;
+	if (noise != NULL) {
+		for (int row_i = 0; row_i < rows; row_i++) {
+			data[row_i] = noise->addNoise(data[row_i], range);
+		}
 	}
 	
 	// delete response count vector
@@ -244,6 +258,10 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 			// grab the model from top models queue
 			model = topModels[model_i];
 			
+//			cout << "Grabbing model" << endl;
+//			model->printModelFactors();
+//			cout << endl;
+			
 			// grab the distances to columns in cs matrix
 			for (int col_i = 0; col_i < csMatrix->getCols(); col_i++) {
 				colDetails[col_i].dotProduct =
@@ -281,6 +299,10 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				// add the term to the model temporarily
 				model->addTerm(bestCol_i);
 				model->leastSquares();
+				
+//				cout << "Ran least squares on:" << endl;
+//				model->printModelFactors();
+//				cout << endl;
 				
 				// check if the model is a duplicate
 				bool isDuplicate = false;
@@ -420,11 +442,14 @@ int main(int argc, char **argv) {
 	
 	// ./Search LA_LARGE.tsv Factors_LARGE.tsv analysis responses_LARGE Throughput 1 13 50 50
 	
+	srand(time(NULL));
+	
 	if (argc < 3) {
 		cout << "Usage: " << argv[0] << " [LocatingArray.tsv] [FactorData.tsv] ..." << endl;
 		return 0;
 	}
 	
+	Noise *noise = NULL;
 	LocatingArray *array = new LocatingArray(argv[1]);
 	FactorData *factorData = new FactorData(argv[2]);
 	
@@ -435,9 +460,6 @@ int main(int argc, char **argv) {
 			int exit;
 			cout << "Check memory and press ENTER" << endl;
 			cin >> exit;
-		} else if (strcmp(argv[arg_i], "printcs") == 0) {
-			cout << "CS Matrix:" << endl;
-			matrix->print();
 		} else if (strcmp(argv[arg_i], "analysis") == 0) {
 			if (arg_i + 6 < argc) {
 				bool performLog = atoi(argv[arg_i + 3]);
@@ -445,7 +467,7 @@ int main(int argc, char **argv) {
 				int models_n = atoi(argv[arg_i + 5]);
 				int newModels_n = atoi(argv[arg_i + 6]);
 				
-				VectorXf *response = loadResponseVector(argv[arg_i + 1], argv[arg_i + 2], performLog);
+				VectorXf *response = loadResponseVector(argv[arg_i + 1], argv[arg_i + 2], performLog, noise);
 				cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 				
 				createModels(array, response, matrix, factorData, terms_n, models_n, newModels_n);
@@ -454,6 +476,19 @@ int main(int argc, char **argv) {
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
 				cout << " [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]" << endl;
+				arg_i = argc;
+			}
+		} else if (strcmp(argv[arg_i], "autofind") == 0) {
+			if (arg_i + 2 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int startRows = atoi(argv[arg_i + 2]);
+				
+				matrix->autoFindRows(k, startRows);
+				
+				arg_i += 2;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [k Separation] [Start Rows]" << endl;
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "fixla") == 0) {
@@ -465,6 +500,38 @@ int main(int argc, char **argv) {
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
 				cout << " [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
+		} else if (strcmp(argv[arg_i], "model") == 0) {
+			if (arg_i + 3 < argc) {
+				string responseDir = string(argv[arg_i + 1]);
+				string responseCol = string(argv[arg_i + 2]);
+				int terms = atoi(argv[arg_i + 3]);
+				
+				float *coefficients = new float[terms];
+				int *columns = new int[terms];
+				
+				arg_i += 3;
+				for (int term_i = 0; term_i < terms; term_i++) {
+					if (arg_i + 2 < argc) {
+						coefficients[term_i] = atof(argv[arg_i + 1]);
+						columns[term_i] = atoi(argv[arg_i + 2]);
+					} else {
+						cout << "Terms are missing" << endl;
+						coefficients[term_i] = 0;
+						columns[term_i] = 0;
+					}
+					arg_i += 2;
+				}
+				
+				matrix->writeResponse(responseDir, responseCol, terms, coefficients, columns);
+				
+				delete [] coefficients;
+				delete [] columns;
+				
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [ResponsesDirectory] [response_column] [Terms] [Term 0 coefficient] [Term 0 column] ..." << endl;
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "mtfixla") == 0) {
@@ -481,19 +548,21 @@ int main(int argc, char **argv) {
 				cout << " [k Separation] [Total Rows] [FixedOutputLA.tsv]" << endl;
 				arg_i = argc;
 			}
-		} else if (strcmp(argv[arg_i], "autofind") == 0) {
-			if (arg_i + 2 < argc) {
-				int k = atoi(argv[arg_i + 1]);
-				int startRows = atoi(argv[arg_i + 2]);
+		} else if (strcmp(argv[arg_i], "noise") == 0) {
+			if (arg_i + 1 < argc) {
+				float ratio = atof(argv[arg_i + 1]);
 				
-				matrix->autoFindRows(k, startRows);
+				noise = new Noise(ratio);
 				
-				arg_i += 2;
+				arg_i += 1;
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
-				cout << " [k Separation] [Start Rows]" << endl;
+				cout << " [ratio]" << endl;
 				arg_i = argc;
 			}
+		} else if (strcmp(argv[arg_i], "printcs") == 0) {
+			cout << "CS Matrix:" << endl;
+			matrix->print();
 		} else if (strcmp(argv[arg_i], "reorderrowsla") == 0) {
 			if (arg_i + 1 < argc) {
 				matrix->reorderRows();

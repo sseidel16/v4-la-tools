@@ -24,8 +24,6 @@ void current_utc_time(struct timespec *ts) {
 
 CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 	
-	srand(time(NULL));
-	
 	this->locatingArray = locatingArray;
 	
 	// assign factor data variable for use with grabbing column names
@@ -409,7 +407,8 @@ void CSMatrix::autoFindRows(int k, int startRows) {
 	Path *path = new Path;
 	path->entryA = NULL;
 	path->entryB = NULL;
-	path->min = twoWayMin;
+//	path->min = twoWayMin;
+	path->min = 0;
 	path->max = getCols() - 1;
 	
 	// add more rows to reach total count
@@ -597,7 +596,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	// run initial checker
 	score = 0;
 	settingToResample = NULL;
-	pathDAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	cout << "Score: " << score << endl;
 	
 	for (int iter = 0; iter < iters && score > 0; iter++) {
@@ -642,7 +641,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		
 		// grab initial time
 		current_utc_time( &start);
-		pathDAChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
+		pathLAChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
 		// check current time
 		current_utc_time( &finish);
 		// get elapsed seconds
@@ -684,7 +683,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	}
 	score = 0;
 	settingToResample = NULL;
-	pathDAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
 	
 }
 
@@ -1680,4 +1679,44 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 	squaredSum += streak * streak;
 	
 	return (squaredSum - getCols());
+}
+
+void CSMatrix::writeResponse(string responseDir, string responseCol, int terms, float *coefficients, int *columns) {
+	cout << responseDir << endl;
+	
+	// initialize all responses to 0
+	float *responses = new float[rows];
+	for (int row_i = 0; row_i < rows; row_i++) {
+		responses[row_i] = 0;
+	}
+	
+	// add contributions from all terms
+	for (int term_i = 0; term_i < terms; term_i++) {
+		
+		CSCol *csCol = data->at(columns[term_i]);
+		float coefficient = coefficients[term_i];
+		
+		cout << coefficient << " * " << getColName(csCol) << endl;
+		
+		for (int row_i = 0; row_i < rows; row_i++) {
+			responses[row_i] += coefficient * csCol->dataP[row_i];
+		}
+	}
+	
+	// open a response file for writing
+	string file = responseDir + "/Response.tsv";
+	ofstream ofs(file.c_str());
+	
+	// write response headers
+	ofs << rows << endl;
+	ofs << responseCol << endl;
+	
+	// write response values
+	for (int row_i = 0; row_i < rows; row_i++) {
+		ofs << responses[row_i] << endl;
+	}
+	
+	// close the file
+	ofs.close();
+
 }

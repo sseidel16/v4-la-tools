@@ -1,6 +1,6 @@
 FLAG = 
 CPLR = g++
-SRCS = FactorData.cpp FactorData.h LocatingArray.cpp LocatingArray.h CSMatrix.cpp CSMatrix.h Model.cpp Model.h Occurrence.h Search.cpp VectorXf.cpp VectorXf.h
+SRCS = CSMatrix.cpp CSMatrix.h FactorData.cpp FactorData.h LocatingArray.cpp LocatingArray.h Model.cpp Model.h Noise.cpp Noise.h Occurrence.h Search.cpp VectorXf.cpp VectorXf.h
 EXEC = Search
 
 $(EXEC): $(SRCS)

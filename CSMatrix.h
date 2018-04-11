@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <sstream>
@@ -25,8 +26,8 @@ struct FactorSetting {
 	
 	bool grouped;
 	char factor_i;
-	char index; // level index (1st level if part of group)
-	char levelsInGroup; // levels in group (1 if not a group)
+	char index;			// level index (1st level if part of group)
+	char levelsInGroup;	// levels in group (1 if not a group)
 	
 };
 struct Mapping {
@@ -143,6 +144,8 @@ public:
 	void systematicRandomFix(int k);
 	void randomFix(int k, int totalRows);
 	void autoFindRows(int k, int startRows);
+	
+	void writeResponse(string responseDir, string responseCol, int terms, float *coefficients, int *columns);
 	
 };
 

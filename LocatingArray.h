@@ -1,6 +1,8 @@
 #ifndef LOCATINGARRAY_H
 #define LOCATINGARRAY_H
 
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 

@@ -1,8 +1,5 @@
 #include "LocatingArray.h"
 
-#include <fstream>
-#include <iostream>
-
 LocatingArray::LocatingArray(string file) {
 	int tempData;
 	
