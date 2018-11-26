@@ -3,7 +3,11 @@
 
 #include <string>
 
+#include "LocatingArray.h"
+
 using namespace std;
+
+struct GroupingInfo;
 
 class Factor {
 public:
@@ -27,14 +31,14 @@ public:
 
 class FactorData {
 private:
-	// total factors (75ish for large dataset)
+	// total factors (75-100ish for large dataset)
 	int factorCount;
 	
 	// array of factor pointers
 	Factor **factors;
 	
 public:
-	
+	FactorData(GroupingInfo **arrayInfo, int factorCount);
 	FactorData(string file);
 	
 	Factor *getFactor(int factor_i);
@@ -43,6 +47,9 @@ public:
 	
 	string getFactorLevelName(int factor_i, int level_i);
 	
+	float getNumericFactorLevel(int factor_i, int level_i);
+	
+	~FactorData();
 };
 
 #endif

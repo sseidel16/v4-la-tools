@@ -6,14 +6,22 @@
 #include <string>
 #include <vector>
 
+#include "ConstraintGroup.h"
+#include "FactorData.h"
+
 using namespace std;
+
+class ConstraintGroup;
+class FactorData;
 
 struct GroupingInfo {
 	int levels;	// total levels for this factor
 	
 	bool grouped;
-	int lessThanFactor;
 	char *levelGroups;
+	
+	ConstraintGroup *conGroup; // constraint group to which this factor belongs
+	int conGroupIndex; // this factor's index in the constraint group above
 };
 
 class LocatingArray {
@@ -27,8 +35,13 @@ private:
 	
 	int t;			// covers t-way interactions
 	
+	int nConGroups;
+	ConstraintGroup **conGroups;
+	
+	FactorData *factorData;
 public:
-	LocatingArray(string file);
+	LocatingArray(int factors, int *levelCounts);
+	LocatingArray(string file, string factorDataFile);
 	
 	void addLevelRow(char *levelRow);
 	char *remLevelRow();
@@ -42,7 +55,14 @@ public:
 	
 	int getT();
 	
+	int getNConGroups();
+	ConstraintGroup **getConGroups();
+	
+	FactorData *getFactorData();
+	
 	void writeToFile(string file);
+	
+	~LocatingArray();
 };
 
 #endif

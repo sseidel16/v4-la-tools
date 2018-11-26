@@ -54,6 +54,9 @@ public:
 	// column headers
 	FactorSetting *setting;
 	
+	//
+	bool coverable;
+	
 };
 
 class CSMatrix {
@@ -80,6 +83,10 @@ private:
 	int **factorLevelMap;
 	Mapping *mapping;
 	
+	bool checkColumnCoverability(CSCol *csCol);
+	bool checkOneWayDistinguishable(CSCol *csCol1, CSCol *csCol2);
+	bool checkDistinguishable(CSCol *csCol1, CSCol *csCol2);
+	
 	void addRow(CSCol *csCol);
 	void remRow(CSCol *csCol);
 	void resizeArray(CSCol **array, int newRows);
@@ -93,7 +100,7 @@ private:
 	void addTWayInteractions(CSCol *csColA, int colBMax_i, int &col_i, int t,
 		Mapping **mapping, vector <float>&sumOfSquares, GroupingInfo **groupingInfo, char **levelMatrix);
 	int populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, int row_len);
-	void randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList, int iters);
+	void randomizePaths(CSCol **array, FactorSetting *&settingToResample, Path *path, int row_top, int k, int c, long long int &score, list <Path*>*pathList, int iters);
 	void repopulateColumns(int setFactor_i, int setLevel_i, int row_top, int row_len);
 	void repopulateColumns(int setFactor_i, int setLevel_i, int maxFactor_i, int t,
 		Mapping *mapping, char **levelMatrix, int &lastCol_i, int row_top, int row_len);
@@ -104,6 +111,8 @@ private:
 	void smartSort(CSCol **array, int sortedRows);
 	void quickSort(CSCol **array, int min, int max, int row_top, int row_len);
 	void rowSort(CSCol **array, int min, int max, int row_i, int row_len);
+	int sortByCoverable(CSCol **array, int min, int max);
+	int sortByTWayInteraction(CSCol **array, int min, int max);
 	void pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList);
 	void deletePath(Path *path);
 	void pathDAChecker(CSCol **array, Path *pathA, Path *pathB, int row_i, int k,
@@ -121,9 +130,10 @@ private:
 	
 	void addRowFix(CSCol **array, long long int &csScore);
 	long long int getArrayScore(CSCol **array);
+	long long int getBruteForceArrayScore(CSCol **array, int k);
 	
 public:
-	CSMatrix(LocatingArray *locatingArray, FactorData *factorData);
+	CSMatrix(LocatingArray *locatingArray);
 	
 	int getRows();
 	int getCols();
@@ -139,14 +149,18 @@ public:
 	
 	void countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude);
 	
-	void reorderRows();
+	void reorderRows(int k, int c);
+	void minCountCheck(CSCol **array, int c,
+		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions);
 	void exactFix();
-	void systematicRandomFix(int k);
-	void randomFix(int k, int totalRows);
-	void autoFindRows(int k, int startRows);
+	void systematicRandomFix(int k, int c, int initialRows, int minChunk);
+	void randomFix(int k, int c, int totalRows);
+	void autoFindRows(int k, int c, int startRows);
+	void performCheck(int k, int c);
 	
 	void writeResponse(string responseDir, string responseCol, int terms, float *coefficients, int *columns);
 	
+	~CSMatrix();
 };
 
 #endif

@@ -11,7 +11,6 @@
 #include <sys/types.h>
 
 #include "CSMatrix.h"
-#include "FactorData.h"
 #include "Model.h"
 #include "LocatingArray.h"
 #include "Noise.h"
@@ -24,7 +23,7 @@ using namespace std;
 WorkSpace *Model::workSpace = NULL;
 
 // loader section
-VectorXf *loadResponseVector(string directory, string column, bool performLog, Noise *noise) {
+void loadResponseVector(VectorXf *response, string directory, string column, bool performLog, Noise *noise) {
 	struct dirent *dp;
 	
 	// open the directory
@@ -34,17 +33,27 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog, N
 		exit(0);
 	}
 	
-	int rows, cols, col_i;
+	int cols, col_i;
 	string header;
+	
+	int rows = response->getLength();
 	
 	string tempString;
 	float tempFloat;
+	int tempInt;
 	
-	float *data, *responseData;
+	// the response count vector
+	VectorXf *responseCount = new VectorXf(rows);
 	
-	// the response vector and response count vector
-	VectorXf *response = NULL;
-	VectorXf *responseCount = NULL;
+	// grab data vectors
+	float *data = response->getData();
+	float *responseData = responseCount->getData();
+	
+	// initialize vectors
+	for (int row_i = 0; row_i < rows; row_i++) {
+		data[row_i] = 0;
+		responseData[row_i] = 0;
+	}
 	
 	while ((dp = readdir(dir)) != NULL) {
 		
@@ -58,29 +67,12 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog, N
 			ifstream ifs(file.c_str(), ifstream::in);
 			
 			// read the headers
-			ifs >> rows;
-			
-			// allocate memory for response vector if necessary
-			if (response == NULL) {
-				// allocate memory
-				response = new VectorXf(rows);
-				responseCount = new VectorXf(rows);
-				
-				// grab data vectors
-				data = response->getData();
-				responseData = responseCount->getData();
-				
-				// initialize vectors
-				for (int row_i = 0; row_i < rows; row_i++) {
-					data[row_i] = 0;
-					responseData[row_i] = 0;
-				}
-			}
+			ifs >> tempInt;
 			
 			// make sure the rows match
-			if (response->getLength() != rows) {
-				cout << "Row mismatch: " << file << endl;
-				cout << "Expected " << response->getLength() << " but received " << rows << endl;
+			if (tempInt != rows) {
+				cout << "Row mismatch (LA vs RE): " << file << endl;
+				cout << "Expected " << rows << " but received " << tempInt << endl;
 				exit(0);
 			}
 			
@@ -173,8 +165,6 @@ VectorXf *loadResponseVector(string directory, string column, bool performLog, N
 	response->calculateSStot();
 	
 	cout << "Loaded responses" << endl;
-	
-	return response;
 }
 
 // comparison, not case sensitive.
@@ -214,7 +204,24 @@ void allocateOccurrences(Occurrence *occurrence, int t, int factors, list<Occurr
 	}
 }
 
-void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *csMatrix, FactorData *factorData,
+void deallocateOccurrences(Occurrence *occurrence, int factors) {
+	
+	if (occurrence != NULL && occurrence->list != NULL) {
+		
+		for (int factor_i = 0; factor_i < factors; factor_i++) {
+			// deallocate list of factors for occurrences
+			delete[] occurrence->list[factor_i].factorList;
+			
+			// deallocate the next dimension
+			deallocateOccurrences(&occurrence->list[factor_i], factor_i);
+		}
+		delete[] occurrence->list;
+		
+	}
+	
+}
+
+void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *csMatrix,
 					int maxTerms, int models_n, int newModels_n) {
 	cout << "Creating Models..." << endl;
 	Model::setupWorkSpace(response->getLength(), maxTerms);
@@ -369,6 +376,8 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 		
 	}
 	
+	delete[] colDetails;
+	
 	// count occurrences
 	Occurrence *occurrence = new Occurrence;
 	occurrence->factorList = new int[0];
@@ -418,7 +427,7 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				// print out the factor combination names
 				for (int factorList_i = 0; factorList_i < (*it)->factorList_n; factorList_i++) {
 					if (factorList_i != 0) cout << " & ";
-					cout << factorData->getFactorName((*it)->factorList[factorList_i]);
+					cout << locatingArray->getFactorData()->getFactorName((*it)->factorList[factorList_i]);
 				}
 				cout << endl;
 			}
@@ -428,6 +437,14 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 		cout << endl;
 
 	}
+	
+	deallocateOccurrences(occurrence, locatingArray->getFactors());
+	delete[] occurrence->factorList;
+	delete occurrence;
+	
+	delete[] occurrenceLists;
+	delete[] topModels;
+	delete[] nextTopModels;
 	
 }
 
@@ -442,18 +459,19 @@ int main(int argc, char **argv) {
 	
 	// ./Search LA_LARGE.tsv Factors_LARGE.tsv analysis responses_LARGE Throughput 1 13 50 50
 	
-	srand(time(NULL));
+	long long int seed = time(NULL);
+	cout << "Seed:\t" << seed << endl;
+	srand(seed);
 	
 	if (argc < 3) {
-		cout << "Usage: " << argv[0] << " [LocatingArray.tsv] [FactorData.tsv] ..." << endl;
+		cout << "Usage: " << argv[0] << " [LocatingArray.tsv] ([FactorData.tsv]) ..." << endl;
 		return 0;
 	}
 	
 	Noise *noise = NULL;
-	LocatingArray *array = new LocatingArray(argv[1]);
-	FactorData *factorData = new FactorData(argv[2]);
+	LocatingArray *array = new LocatingArray(argv[1], argv[2]);
 	
-	CSMatrix *matrix = new CSMatrix(array, factorData);
+	CSMatrix *matrix = new CSMatrix(array);
 	
 	for (int arg_i = 3; arg_i < argc; arg_i++) {
 		if (strcmp(argv[arg_i], "memchk") == 0) {
@@ -467,10 +485,12 @@ int main(int argc, char **argv) {
 				int models_n = atoi(argv[arg_i + 5]);
 				int newModels_n = atoi(argv[arg_i + 6]);
 				
-				VectorXf *response = loadResponseVector(argv[arg_i + 1], argv[arg_i + 2], performLog, noise);
+				VectorXf *response = new VectorXf(array->getTests());
+				loadResponseVector(response, argv[arg_i + 1], argv[arg_i + 2], performLog, noise);
 				cout << "Response range: " << response->getData()[0] << " to " << response->getData()[response->getLength() - 1] << endl;
 				
-				createModels(array, response, matrix, factorData, terms_n, models_n, newModels_n);
+				createModels(array, response, matrix, terms_n, models_n, newModels_n);
+				delete response;
 				
 				arg_i += 6;
 			} else {
@@ -479,16 +499,17 @@ int main(int argc, char **argv) {
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "autofind") == 0) {
-			if (arg_i + 2 < argc) {
+			if (arg_i + 3 < argc) {
 				int k = atoi(argv[arg_i + 1]);
-				int startRows = atoi(argv[arg_i + 2]);
+				int c = atoi(argv[arg_i + 2]);
+				int startRows = atoi(argv[arg_i + 3]);
 				
-				matrix->autoFindRows(k, startRows);
+				matrix->autoFindRows(k, c, startRows);
 				
-				arg_i += 2;
+				arg_i += 3;
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
-				cout << " [k Separation] [Start Rows]" << endl;
+				cout << " [k Separation] [c Minimum Count] [Start Rows]" << endl;
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "fixla") == 0) {
@@ -535,17 +556,47 @@ int main(int argc, char **argv) {
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "mtfixla") == 0) {
-			if (arg_i + 3 < argc) {
+			if (arg_i + 4 < argc) {
 				int k = atoi(argv[arg_i + 1]);
-				int totalRows = atoi(argv[arg_i + 2]);
+				int c = atoi(argv[arg_i + 2]);
+				int totalRows = atoi(argv[arg_i + 3]);
 				
-				matrix->randomFix(k, totalRows);
-				array->writeToFile(argv[arg_i + 3]);
+				matrix->randomFix(k, c, totalRows);
+				array->writeToFile(argv[arg_i + 4]);
 				
-				arg_i += 3;
+				arg_i += 4;
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
-				cout << " [k Separation] [Total Rows] [FixedOutputLA.tsv]" << endl;
+				cout << " [k Separation] [c Minimum Count] [Total Rows] [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
+		} else if (strcmp(argv[arg_i], "sysfixla") == 0) {
+			if (arg_i + 5 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int c = atoi(argv[arg_i + 2]);
+				int initialRows = atoi(argv[arg_i + 3]);
+				int minChunk = atoi(argv[arg_i + 4]);
+				
+				matrix->systematicRandomFix(k, c, initialRows, minChunk);
+				array->writeToFile(argv[arg_i + 5]);
+				
+				arg_i += 5;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [k Separation] [c Minimum Count] [Initial Rows] [Minimum Chunk] [FixedOutputLA.tsv]" << endl;
+				arg_i = argc;
+			}
+		} else if (strcmp(argv[arg_i], "checkla") == 0) {
+			if (arg_i + 2 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int c = atoi(argv[arg_i + 2]);
+				
+				matrix->performCheck(k, c);
+				
+				arg_i += 2;
+			} else {
+				cout << "Usage: ... " << argv[arg_i];
+				cout << " [k Separation] [c Minimum Count]" << endl;
 				arg_i = argc;
 			}
 		} else if (strcmp(argv[arg_i], "noise") == 0) {
@@ -564,14 +615,17 @@ int main(int argc, char **argv) {
 			cout << "CS Matrix:" << endl;
 			matrix->print();
 		} else if (strcmp(argv[arg_i], "reorderrowsla") == 0) {
-			if (arg_i + 1 < argc) {
-				matrix->reorderRows();
-				array->writeToFile(argv[arg_i + 1]);
+			if (arg_i + 3 < argc) {
+				int k = atoi(argv[arg_i + 1]);
+				int c = atoi(argv[arg_i + 2]);
+
+				matrix->reorderRows(k, c);
+				array->writeToFile(argv[arg_i + 3]);
 				
-				arg_i += 1;
+				arg_i += 3;
 			} else {
 				cout << "Usage: ... " << argv[arg_i];
-				cout << " [ReorderedOutputLA.tsv]" << endl;
+				cout << " [k Separation] [c Minimum Count] [ReorderedOutputLA.tsv]" << endl;
 				arg_i = argc;
 			}
 		}
@@ -580,6 +634,9 @@ int main(int argc, char **argv) {
 	cout << endl;
 	cout << "Other Stuff:" << endl;
 	cout << "Columns in CSMatrix: " << matrix->getCols() << endl;
+	
+	delete matrix;
+	delete array;
 	
 	return 0;
 	

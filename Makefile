@@ -1,10 +1,13 @@
-FLAG = 
 CPLR = g++
-SRCS = CSMatrix.cpp CSMatrix.h FactorData.cpp FactorData.h LocatingArray.cpp LocatingArray.h Model.cpp Model.h Noise.cpp Noise.h Occurrence.h Search.cpp VectorXf.cpp VectorXf.h
 EXEC = Search
+DEPS = CSMatrix.h FactorData.h LocatingArray.h Model.h Noise.h Occurrence.h VectorXf.h
+FLAGS =
 
-$(EXEC): $(SRCS)
-	$(CPLR) -o $@ $^ $(FLAG)
+%.o: %.cpp $(DEPS)
+	$(CPLR) -c $< $(FLAGS)
+
+$(EXEC): ConstraintGroup.o CSMatrix.o FactorData.o LocatingArray.o Model.o Noise.o Search.o VectorXf.o VectorXf.h
+	$(CPLR) -o $@ $^
 
 clean:
 	rm -f ./*.o $(EXEC)

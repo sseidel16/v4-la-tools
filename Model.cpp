@@ -415,12 +415,12 @@ Model::~Model() {
 	}
 	
 	// delete coefficients vector
-	delete coefVec;
+	delete[] coefVec;
 	
 	// delete residuals vector
-	delete resiVec;
+	delete[] resiVec;
 	
 	// delete model response
-	delete modelResponse;
+	delete[] modelResponse;
 	
 }

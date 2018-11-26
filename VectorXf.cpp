@@ -49,5 +49,5 @@ float VectorXf::getSStot() {
 }
 
 VectorXf::~VectorXf() {
-	delete data;
+	delete[] data;
 }

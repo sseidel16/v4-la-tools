@@ -22,12 +22,12 @@ void current_utc_time(struct timespec *ts) {
 	#endif
 }
 
-CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
+CSMatrix::CSMatrix(LocatingArray *locatingArray) {
 	
 	this->locatingArray = locatingArray;
 	
 	// assign factor data variable for use with grabbing column names
-	this->factorData = factorData;
+	this->factorData = locatingArray->getFactorData();
 	
 	// to be used when populating CSMatrix
 	CSCol *csCol;
@@ -75,7 +75,7 @@ CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 	// populate the intercept
 	for (int row_i = 0; row_i < rows; row_i++) {
 		addRow(csCol);
-		csCol->dataP[row_i] = 1;
+		csCol->dataP[row_i] = ENTRY_A;
 		sum += 1;
 	}
 	
@@ -111,6 +111,16 @@ CSMatrix::CSMatrix(LocatingArray *locatingArray, FactorData *factorData) {
 		mapping->mapping, sumOfSquares, groupingInfo, levelMatrix);
 	
 	cout << "Went over " << col_i << " columns" << endl;
+	
+	// check coverability
+	for (int col_i = 0; col_i < getCols(); col_i++) {
+		csCol = data->at(col_i);
+		csCol->coverable = checkColumnCoverability(csCol);
+		
+		if (!csCol->coverable) {
+			cout << "Not coverable: " << getColName(csCol) << endl;
+		}
+	}
 	
 	// perform sqaure roots on sum of squares
 	for (int col_i = 0; col_i < getCols(); col_i++) {
@@ -275,9 +285,8 @@ int CSMatrix::populateColumnData(CSCol *csCol, char **levelMatrix, int row_top, 
 	return sum;
 }
 
-void CSMatrix::reorderRows() {
+void CSMatrix::reorderRows(int k, int c) {
 	FactorSetting *settingToResample;
-	int k = 2;
 	int nPaths;
 	long long int score;
 	int cols = getCols();
@@ -288,12 +297,18 @@ void CSMatrix::reorderRows() {
 		array[col_i] = data->at(col_i);
 	}
 	
+	int coverableMin = sortByCoverable(array, 0, getCols() - 1);
+	cout << "Coverable columns begin at: " << coverableMin << endl;
+	
+	int tWayMin = sortByTWayInteraction(array, coverableMin, getCols() - 1);
+	cout << "t-way interactions begin at: " << tWayMin << endl;
+	
 	long long int *rowContributions = new long long int[rows];
 	
 	Path *path = new Path;
 	path->entryA = NULL;
 	path->entryB = NULL;
-	path->min = 0;
+	path->min = coverableMin;
 	path->max = getCols() - 1;
 	
 	while (true) {
@@ -304,6 +319,7 @@ void CSMatrix::reorderRows() {
 		score = 0;
 		settingToResample = NULL;
 		pathLAChecker(array, path, path, 0, k, score, settingToResample, rowContributions);
+		minCountCheck(array, c, score, settingToResample, rowContributions);
 		
 		cout << "Score: " << score << ": " << getArrayScore(array) << endl;
 		
@@ -356,6 +372,41 @@ void CSMatrix::reorderRows() {
 	delete rowContributions;
 }
 
+void CSMatrix::minCountCheck(CSCol **array, int c,
+		long long int &score, FactorSetting *&settingToResample, long long int *rowContributions) {
+	int cols = getCols();
+	
+	int *count = new int[cols];
+	
+	for (int col_i = 0; col_i < cols; col_i++) {
+		count[col_i] = 0;
+		
+		for (int row_i = 0; row_i < rows && count[col_i] < c; row_i++) {
+			if (array[col_i]->coverable && array[col_i]->dataP[row_i] == ENTRY_A) {
+				count[col_i]++;
+				
+				// add row contributions
+				if (rowContributions != NULL) {
+					rowContributions[row_i]++;
+				}
+			}
+		}
+	}
+	
+	for (int col_i = 0; col_i < cols; col_i++) {
+		if (array[col_i]->coverable && count[col_i] < c) {
+//			cout << "Below c requirement (" << count[col_i] << "): " << getColName(array[col_i]) << endl;
+			score += c - count[col_i];
+			if (settingToResample == NULL) {
+				// randomly choose a setting in the column to resample
+				settingToResample = &array[col_i]->setting[rand() % array[col_i]->factors];
+			}
+		}
+	}
+	
+	delete[] count;
+}
+
 void CSMatrix::exactFix() {
 	
 	// create a work array
@@ -364,22 +415,148 @@ void CSMatrix::exactFix() {
 		array[col_i] = data->at(col_i);
 	}
 	
+	long long int score = 0;
+	
 	smartSort(array, 0);
+	score = getArrayScore(array);
+
+	cout << "Original linear LA Score: " << score << endl;
 	
-	long long int csScore = getArrayScore(array);
-	cout << "Original LA Score: " << csScore << endl;
-	
-	while (csScore > 0) {
-		addRowFix(array, csScore);
+	if (locatingArray->getNConGroups() == 0) {
+		while (score > 0) {
+			addRowFix(array, score);
+		}
+		
+		cout << "Complete LA created with score: " << score << endl;
+		cout << "Rows: " << getRows() << endl;
+	} else {
+		cout << "Unable to perform fixla because constraints were found. Remove the constraints to perform this operation!" << endl;
 	}
-	
-	cout << "Complete LA created with score: " << csScore << endl;
 	
 	delete[] array;
 	
 }
 
-void CSMatrix::autoFindRows(int k, int startRows) {
+void CSMatrix::performCheck(int k, int c) {
+	
+	int nConGroups = locatingArray->getNConGroups();
+	ConstraintGroup **conGroups = locatingArray->getConGroups();
+	long long int score = 0;
+	struct timespec start;
+	struct timespec finish;
+	float elapsedTime;
+	
+	// create a work array
+	CSCol **array = new CSCol*[getCols()];
+	for (int col_i = 0; col_i < getCols(); col_i++) {
+		array[col_i] = data->at(col_i);
+	}
+	
+	int coverableMin = sortByCoverable(array, 0, getCols() - 1);
+	cout << "Coverable columns begin at: " << coverableMin << endl;
+	
+	int tWayMin = sortByTWayInteraction(array, coverableMin, getCols() - 1);
+	cout << "t-way interactions begin at: " << tWayMin << endl;
+	
+	Path *path = new Path;
+	path->entryA = NULL;
+	path->entryB = NULL;
+	path->min = coverableMin;
+	path->max = getCols() - 1;
+	
+	list <Path*>pathList;
+	
+	int nPaths = 0;
+	
+	// grab initial time
+	current_utc_time( &start);
+	pathSort(array, path, 0, nPaths, &pathList);
+	// check current time
+	current_utc_time( &finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	cout << "Elapsed for path sort: " << elapsedTime << endl;
+	
+	cout << "Memory check: nPaths = " << nPaths << " of size " << sizeof(Path) << endl;
+	cout << "Unfinished paths: " << pathList.size() << endl;
+	
+	// grab initial time
+	current_utc_time( &start);
+	FactorSetting *settingToResample = NULL;
+	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	minCountCheck(array, c, score, settingToResample, NULL);
+	// check current time
+	current_utc_time( &finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	
+	cout << "Path and min count LA Score: " << score << endl;
+	cout << "Elapsed for path and min count check: " << elapsedTime << endl;
+	
+	deletePath(path);
+	
+	// grab initial time
+	current_utc_time(&start);
+	smartSort(array, 0);
+	// check current time
+	current_utc_time(&finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	
+	cout << "Elapsed for smart sort: " << elapsedTime << endl;	
+	
+	// grab initial time
+	current_utc_time(&start);
+	score = getArrayScore(array);
+	minCountCheck(array, c, score, settingToResample, NULL);
+	// check current time
+	current_utc_time(&finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+	cout << "Weird linear check LA Score (should not match other scores): " << score << endl;
+	cout << "Elapsed for linear check: " << elapsedTime << endl;	
+	
+	/* BRUTE FORCE */
+	cout << "Performing brute force check... this could take awhile" << endl;
+	// grab initial time
+	current_utc_time(&start);
+	score = getBruteForceArrayScore(array, k);
+	minCountCheck(array, c, score, settingToResample, NULL);
+	// check current time
+	current_utc_time(&finish);
+	// get elapsed seconds
+	elapsedTime = (finish.tv_sec - start.tv_sec);
+	// add elapsed nanoseconds
+	elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	
+	cout << "Brute force and min count LA Score (should match path score): " << score << endl;
+	cout << "Elapsed for brute force check: " << elapsedTime << endl;
+	
+	cout << "Checking for constraint violations..." << endl;
+	for (int row_i = 0; row_i < rows; row_i++) {
+		for (int conGroup_i = 0; conGroup_i < nConGroups; conGroup_i++) {
+			if (!conGroups[conGroup_i]->getResult(row_i)) {
+				cout << "Constraint group " << conGroup_i << " violated in row " << row_i << endl;
+			}
+		}
+		
+	}
+	cout << "Done!" << endl;
+	
+	delete[] array;
+	
+}
+
+void CSMatrix::autoFindRows(int k, int c, int startRows) {
 	
 	int iters = 1000;
 	int cols = getCols();
@@ -427,15 +604,17 @@ void CSMatrix::autoFindRows(int k, int startRows) {
 			pathList.push_front(path);
 			
 			score = 0;
-			randomizePaths(array, path, 0, k, score, &pathList, iters);
+			randomizePaths(array, settingToResample, path, 0, k, c, score, &pathList, iters);
 			
 			cout << "Score: " << score << endl;
 			
-			if (score == 0) {
+			if (settingToResample == NULL) {
 				testPassed = true;
 				break;
+			} else if (score > 100) {
+				// do not try 5 times because the score is greater than 100
+				break;
 			}
-			else if (score > 100) break;
 		}
 		
 		// reset upper / lower bounds
@@ -464,7 +643,7 @@ void CSMatrix::autoFindRows(int k, int startRows) {
 	
 }
 
-void CSMatrix::randomFix(int k, int totalRows) {
+void CSMatrix::randomFix(int k, int c, int totalRows) {
 	
 	int iters = 1000;
 	int cols = getCols();
@@ -475,11 +654,11 @@ void CSMatrix::randomFix(int k, int totalRows) {
 		array[col_i] = data->at(col_i);
 	}
 	
-	int twoWayMin;
-	for (twoWayMin = 0; twoWayMin < cols; twoWayMin++) {
-		if (array[twoWayMin]->factors > 1) break;
-	}
-	cout << "Two-Way Min: " << twoWayMin << endl;
+	int coverableMin = sortByCoverable(array, 0, cols - 1);
+	cout << "Coverable columns begin at: " << coverableMin << endl;
+	
+	int tWayMin = sortByTWayInteraction(array, coverableMin, cols - 1);
+	cout << "t-way interactions begin at: " << tWayMin << endl;
 	
 	int factors = locatingArray->getFactors();
 	int nPaths = 0;
@@ -489,7 +668,7 @@ void CSMatrix::randomFix(int k, int totalRows) {
 	Path *path = new Path;
 	path->entryA = NULL;
 	path->entryB = NULL;
-	path->min = 0;
+	path->min = coverableMin;
 	path->max = getCols() - 1;
 	
 	// add more rows to reach total count
@@ -499,7 +678,9 @@ void CSMatrix::randomFix(int k, int totalRows) {
 	pathList.push_front(path);
 	
 	score = 0;
-	randomizePaths(array, path, 0, k, score, &pathList, iters);
+	randomizePaths(array, settingToResample, path, 0, k, c, score, &pathList, iters);
+	
+	minCountCheck(array, c, score, settingToResample, NULL);
 	
 	cout << "Score: " << score << endl;
 	
@@ -507,8 +688,8 @@ void CSMatrix::randomFix(int k, int totalRows) {
 	
 }
 
-void CSMatrix::systematicRandomFix(int k) {
-	int chunk = 10;
+void CSMatrix::systematicRandomFix(int k, int c, int initialRows, int minChunk) {
+	int chunk = initialRows;
 	int finalizedRows = rows;
 	int totalRows = (finalizedRows + chunk);
 	int cols = getCols();
@@ -519,10 +700,16 @@ void CSMatrix::systematicRandomFix(int k) {
 		array[col_i] = data->at(col_i);
 	}
 	
+	int coverableMin = sortByCoverable(array, 0, cols - 1);
+	cout << "Coverable columns begin at: " << coverableMin << endl;
+	
+	int tWayMin = sortByTWayInteraction(array, coverableMin, cols - 1);
+	cout << "t-way interactions begin at: " << tWayMin << endl;
+	
 	Path *path = new Path;
 	path->entryA = NULL;
 	path->entryB = NULL;
-	path->min = 0;
+	path->min = coverableMin;
 	path->max = getCols() - 1;
 	
 	list <Path*>pathList;
@@ -542,6 +729,7 @@ void CSMatrix::systematicRandomFix(int k) {
 	
 	FactorSetting *settingToResample = NULL;
 	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	minCountCheck(array, c, score, settingToResample, NULL);
 	
 	// check current time
 	current_utc_time( &finish);
@@ -554,38 +742,39 @@ void CSMatrix::systematicRandomFix(int k) {
 	cout << "Score: " << score << endl;
 	int factors = locatingArray->getFactors();
 	
-	while (score > 0) {
-		while (rows < totalRows) {
-			// allocate memory for new row of locating array
-			char *levelRow = new char[factors];
-			
-			// generate random row
-			for (int factor_i = 0; factor_i < factors; factor_i++) {
-				levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
-			}
-			
-			addRow(array, levelRow);
-		}
+	while (settingToResample != NULL) {
+		resizeArray(array, totalRows);
 		
-		randomizePaths(array, path, finalizedRows, k, score, &pathList, 1000);
+		randomizePaths(array, settingToResample, path, finalizedRows, k, c, score, &pathList, 1000);
 		finalizedRows = rows;
 		
-		chunk -= chunk / 4;
+		chunk -= chunk / 2;
+		if (chunk < minChunk) chunk = minChunk;
 		totalRows += chunk;
 	}
 	
 }
 
-void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, long long int &score, list <Path*>*pathList, int iters) {
+void CSMatrix::randomizePaths(CSCol **array, FactorSetting *&settingToResample, Path *path, int row_top, int k, int c, long long int &score, list <Path*>*pathList, int iters) {
 	
 	int cols = getCols();
 	long long int newScore;
 	int factor_i, nPaths;
-	FactorSetting *settingToResample;
+	ConstraintGroup *conGroup;
 	char **levelMatrix = locatingArray->getLevelMatrix();
+	int factors = locatingArray->getFactors();
+	
+	// custom factors to resample
+	int nCustomFactors = 0;
+	int *customFactorIndeces = new int[nCustomFactors];
+//	customFactorIndeces[0] = 16;
+//	customFactorIndeces[1] = 17;
 	
 	// allocate memory for saving old levels of locating array
-	char *oldLevels = new char[rows];
+	char **oldLevels = new char*[rows];
+	for (int row_i = 0; row_i < rows; row_i++) {
+		oldLevels[row_i] = new char[factors];
+	}
 	
 	// sort paths
 	for (std::list<Path*>::iterator it = pathList->begin(); it != pathList->end(); it++) {
@@ -597,6 +786,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	score = 0;
 	settingToResample = NULL;
 	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	minCountCheck(array, c, score, settingToResample, NULL);
 	cout << "Score: " << score << endl;
 	
 	for (int iter = 0; iter < iters && score > 0; iter++) {
@@ -605,21 +795,66 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		struct timespec finish;
 		float elapsedTime;
 		
-		// get factor to resample
-		factor_i = settingToResample->factor_i;
+		// ensure we recieved an actual setting
+		if (settingToResample == NULL) {
+			cout << "No resampleable setting was found" << endl;
+			break;
+		}
 		
-		// resample locating array
-		for (int row_i = row_top; row_i < rows; row_i++) {
-			oldLevels[row_i] = levelMatrix[row_i][factor_i];
-			if (rand() % 100 < 100) {
-				levelMatrix[row_i][factor_i] = rand() % groupingInfo[factor_i]->levels;
+		// get factors to resample (all factors in constraint group if one exists)
+		conGroup = groupingInfo[settingToResample->factor_i]->conGroup;
+		if (conGroup == NULL) {
+			// get factor to resample
+			factor_i = settingToResample->factor_i;
+			
+			// resample locating array
+			for (int row_i = row_top; row_i < rows; row_i++) {
+				oldLevels[row_i][factor_i] = levelMatrix[row_i][factor_i];
+				if (rand() % 100 < 100) {
+					levelMatrix[row_i][factor_i] = rand() % groupingInfo[factor_i]->levels;
+				}
+			}
+			
+			// repopulate columns of CS matrix
+			for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+				repopulateColumns(factor_i, level_i, row_top, rows - row_top);
+			}
+		} else if (nCustomFactors > 0) {
+			for (int row_i = row_top; row_i < rows; row_i++) {
+				for (int factor_i = 0; factor_i < nCustomFactors; factor_i++) {
+					oldLevels[row_i][customFactorIndeces[factor_i]] = levelMatrix[row_i][customFactorIndeces[factor_i]];
+				}
+				if (rand() % 100 < 100) {
+					for (int factor_i = 0; factor_i < nCustomFactors; factor_i++) {
+						levelMatrix[row_i][customFactorIndeces[factor_i]] = rand() % groupingInfo[customFactorIndeces[factor_i]]->levels;
+					}
+				}
+			}
+				
+			// repopulate columns of CS matrix for every factor in constraint group and for each level
+			for (int factor_i = 0; factor_i < nCustomFactors; factor_i++) {
+				for (int level_i = 0; level_i < groupingInfo[customFactorIndeces[factor_i]]->levels; level_i++) {
+					repopulateColumns(customFactorIndeces[factor_i], level_i, row_top, rows - row_top);
+				}
+			}
+		} else {
+			for (int row_i = row_top; row_i < rows; row_i++) {
+				for (int factor_i = 0; factor_i < conGroup->factors; factor_i++) {
+					oldLevels[row_i][conGroup->factorIndeces[factor_i]] = levelMatrix[row_i][conGroup->factorIndeces[factor_i]];
+				}
+				if (rand() % 100 < 100) {
+					conGroup->randPopulateLevelRow(levelMatrix[row_i]);
+				}
+			}
+				
+			// repopulate columns of CS matrix for every factor in constraint group and for each level
+			for (int factor_i = 0; factor_i < conGroup->factors; factor_i++) {
+				for (int level_i = 0; level_i < groupingInfo[conGroup->factorIndeces[factor_i]]->levels; level_i++) {
+					repopulateColumns(conGroup->factorIndeces[factor_i], level_i, row_top, rows - row_top);
+				}
 			}
 		}
 		
-		// repopulate columns of CS matrix
-		for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
-			repopulateColumns(factor_i, level_i, row_top, rows - row_top);
-		}
 		
 		// grab initial time
 		current_utc_time( &start);
@@ -642,6 +877,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		// grab initial time
 		current_utc_time( &start);
 		pathLAChecker(array, path, path, 0, k, newScore, newSettingToResample, NULL);
+		minCountCheck(array, c, newScore, newSettingToResample, NULL);
 		// check current time
 		current_utc_time( &finish);
 		// get elapsed seconds
@@ -650,27 +886,66 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 		elapsedTime += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 //		cout << "Elapsed After Checker: " << elapsedTime << endl;
 		
-		if (newScore <= score) {
+		if (newScore <= score) { // add "|| true" to cause every change to be implemented, not just improving changes
 			cout << "Rows: " << rows << " Iter: " << iter << ": ";
 			cout << newScore << ": \t" << score << " \tAccepted " << endl;
 			settingToResample = newSettingToResample;
 			score = newScore;
 		} else {
-			// rollback the change
-			for (int row_i = row_top; row_i < rows; row_i++) {
-				levelMatrix[row_i][factor_i] = oldLevels[row_i];
-			}
+			cout << "Rows: " << rows << " Iter: " << iter << ": ";
+			cout << score << " \tMaintained " << endl;
 			
-			// repopulate columns of CS matrix
-			for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
-				repopulateColumns(factor_i, level_i, row_top, rows - row_top);
+			if (conGroup == NULL) {
+				// get factor to resample
+				factor_i = settingToResample->factor_i;
+				
+				// rollback the change
+				for (int row_i = row_top; row_i < rows; row_i++) {
+					levelMatrix[row_i][factor_i] = oldLevels[row_i][factor_i];
+				}
+				
+				// repopulate columns of CS matrix
+				for (int level_i = 0; level_i < groupingInfo[factor_i]->levels; level_i++) {
+					repopulateColumns(factor_i, level_i, row_top, rows - row_top);
+				}
+			} else if (nCustomFactors > 0) {
+				for (int row_i = row_top; row_i < rows; row_i++) {
+					for (int factor_i = 0; factor_i < nCustomFactors; factor_i++) {
+						levelMatrix[row_i][customFactorIndeces[factor_i]] = oldLevels[row_i][customFactorIndeces[factor_i]];
+					}
+				}
+					
+				// repopulate columns of CS matrix for every factor in constraint group and for each level
+				for (int factor_i = 0; factor_i < nCustomFactors; factor_i++) {
+					for (int level_i = 0; level_i < groupingInfo[customFactorIndeces[factor_i]]->levels; level_i++) {
+						repopulateColumns(customFactorIndeces[factor_i], level_i, row_top, rows - row_top);
+					}
+				}
+			} else {
+				// rollback the change
+				for (int row_i = row_top; row_i < rows; row_i++) {
+					for (int factor_i = 0; factor_i < conGroup->factors; factor_i++) {
+						levelMatrix[row_i][conGroup->factorIndeces[factor_i]] = oldLevels[row_i][conGroup->factorIndeces[factor_i]];
+					}
+				}
+					
+				// repopulate columns of CS matrix for every factor in constraint group and for each level
+				for (int factor_i = 0; factor_i < conGroup->factors; factor_i++) {
+					for (int level_i = 0; level_i < groupingInfo[conGroup->factorIndeces[factor_i]]->levels; level_i++) {
+						repopulateColumns(conGroup->factorIndeces[factor_i], level_i, row_top, rows - row_top);
+					}
+				}
 			}
-			
 //			cout << score << ": \t" << newScore << " \tRejected" << endl;
 		}
 	}
 	
+	// deallocate all memory
+	for (int row_i = 0; row_i < rows; row_i++) {
+		delete[] oldLevels[row_i];
+	}
 	delete[] oldLevels;
+	delete[] customFactorIndeces;
 	
 	// perform one last sort and save final unfinished paths to list
 	list <Path*>newPathList(*pathList);
@@ -684,6 +959,7 @@ void CSMatrix::randomizePaths(CSCol **array, Path *path, int row_top, int k, lon
 	score = 0;
 	settingToResample = NULL;
 	pathLAChecker(array, path, path, 0, k, score, settingToResample, NULL);
+	minCountCheck(array, c, score, settingToResample, NULL);
 	
 }
 
@@ -916,9 +1192,9 @@ void CSMatrix::addOneWayInteraction(int factor_i, char level_i, char **levelMatr
 		
 		// 1 or -1 depending on if the factor levels matched
 		if (level_i == levelMatrix[row_i][factor_i])
-			csCol->dataP[row_i] = 1;
+			csCol->dataP[row_i] = ENTRY_A;
 		else
-			csCol->dataP[row_i] = -1;
+			csCol->dataP[row_i] = ENTRY_B;
 		
 		// add to sum of squares
 		sum += csCol->dataP[row_i] * csCol->dataP[row_i];
@@ -1046,6 +1322,61 @@ void CSMatrix::rowSort(CSCol **array, int min, int max, int row_i, int row_len) 
 	
 }
 
+int CSMatrix::sortByCoverable(CSCol **array, int min, int max) {
+	
+	if (min >= max) return min;
+	
+	int tempMin = min - 1;
+	int tempMax = max + 1;
+	
+	while (true) {
+		while (tempMin < max && !array[tempMin + 1]->coverable) tempMin++;
+		while (tempMax > min && array[tempMax - 1]->coverable) tempMax--;
+		
+		if (tempMax - 1 > tempMin + 1) {
+			swapColumns(array, tempMin + 1, tempMax - 1);
+		} else {
+			break;
+		}
+	}
+	
+	// verification
+	for (int col_i = min; col_i <= tempMin; col_i++) {
+		if (array[col_i]->coverable) cout << "mistake" << endl;
+	}
+	
+	return tempMin + 1;
+	
+}
+
+int CSMatrix::sortByTWayInteraction(CSCol **array, int min, int max) {
+	
+	if (min >= max) return min;
+	
+	int t = locatingArray->getT();
+	int tempMin = min - 1;
+	int tempMax = max + 1;
+	
+	while (true) {
+		while (tempMin < max && array[tempMin + 1]->factors < t) tempMin++;
+		while (tempMax > min && array[tempMax - 1]->factors == t) tempMax--;
+		
+		if (tempMax - 1 > tempMin + 1) {
+			swapColumns(array, tempMin + 1, tempMax - 1);
+		} else {
+			break;
+		}
+	}
+	
+	// verification
+	for (int col_i = min; col_i <= tempMin; col_i++) {
+		if (array[col_i]->factors == t) cout << "mistake" << endl;
+	}
+	
+	return tempMin + 1;
+	
+}
+
 void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list <Path*>*pathList) {
 	if (path->min == path->max) {
 		deletePath(path->entryA);
@@ -1074,6 +1405,7 @@ void CSMatrix::pathSort(CSCol **array, Path *path, int row_i, int &nPaths, list 
 		}
 	}
 	
+	// verification
 	for (int col_i = path->min; col_i <= tempMin; col_i++) {
 		if (array[col_i]->dataP[row_i] != ENTRY_A) cout << "mistake" << endl;
 	}
@@ -1147,7 +1479,9 @@ void CSMatrix::pathLAChecker(CSCol **array, Path *pathA, Path *pathB, int row_i,
 		
 		// set a setting to resample
 		if (settingToResample == NULL) {
-			int columnToResample;
+			int columnToResample = -1;
+			
+			/*
 			int offset;
 			do {
 				offset = rand() % (pathA->max - pathA->min + 1 + pathB->max - pathB->min + 1);
@@ -1158,8 +1492,30 @@ void CSMatrix::pathLAChecker(CSCol **array, Path *pathA, Path *pathB, int row_i,
 					columnToResample = pathB->min + offset;
 				}
 			} while (array[columnToResample]->factors <= 0);
+			*/
 			
-			settingToResample = &array[columnToResample]->setting[rand() % array[columnToResample]->factors];
+			// find a pair of columns that is distinguishable
+			for (int i_a = pathA->min;
+					i_a <= pathA->max && columnToResample == -1; i_a++) {
+				for (int i_b = (pathA == pathB ? i_a + 1 : 0);
+						i_b <= pathB->max && columnToResample == -1; i_b++) {
+					if (checkDistinguishable(array[i_a], array[i_b])) {
+						if (rand() % 2 && array[i_a]->factors > 0) {
+							columnToResample = i_a;
+						} else if (array[i_b]->factors > 0) {
+							columnToResample = i_b;
+						}
+					} else {
+//						score--;
+//						cout << "Not distinguishable: " << getColName(array[i_a]) << " vs " << getColName(array[i_b]) << endl;
+					}
+				}
+			}
+			
+			// randomly choose a setting in the column to resample
+			if (columnToResample != -1) {
+				settingToResample = &array[columnToResample]->setting[rand() % array[columnToResample]->factors];
+			}
 		}
 		
 		return;
@@ -1406,6 +1762,8 @@ void CSMatrix::remRow(CSCol **array) {
 
 void CSMatrix::resizeArray(CSCol **array, int newRows) {
 	int factors = locatingArray->getFactors();
+	int nConGroups = locatingArray->getNConGroups();
+	ConstraintGroup **conGroups = locatingArray->getConGroups();
 	
 	// increase size as needed
 	while (newRows > rows) {
@@ -1417,13 +1775,115 @@ void CSMatrix::resizeArray(CSCol **array, int newRows) {
 			levelRow[factor_i] = rand() % groupingInfo[factor_i]->levels;
 		}
 		
+		// resample constraint groups
+		for (int conGroup_i = 0; conGroup_i < nConGroups; conGroup_i++) {
+			conGroups[conGroup_i]->randPopulateLevelRow(levelRow);
+		}
+		
 		addRow(array, levelRow);
 	}
 	
-	// increase size as needed
+	// decrease size as needed
 	while (newRows < rows && rows > 1) {
 		remRow(array);
 	}
+}
+
+bool CSMatrix::checkColumnCoverability(CSCol *csCol) {
+	
+	int factors = locatingArray->getFactors();
+	int nConGroups = locatingArray->getNConGroups();
+	ConstraintGroup **conGroups = locatingArray->getConGroups();
+	
+	char *requireLevelRow = new char[factors];
+	char *avoidLevelRow = new char[factors];
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		requireLevelRow[factor_i] = -1;
+		avoidLevelRow[factor_i] = -1;
+	}
+	
+	// set to require csCol1 settings
+	for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+		requireLevelRow[csCol->setting[setting_i].factor_i] = csCol->setting[setting_i].index;
+	}
+	
+	// check if possible for every constraint group
+	bool satisfiableInGroups = true;
+	for (int conGroup_i = 0; conGroup_i < nConGroups; conGroup_i++) {
+		if (!conGroups[conGroup_i]->satisfiableInGroupLA(requireLevelRow, avoidLevelRow)) {
+			satisfiableInGroups = false;
+			break;
+		}
+	}
+	
+	/* for factors not in a constraint group, simply set their settings in csCol1 to be ENTRY_A,
+	 and the check passes because the interaction cannot be only */
+	
+	// deallocate memory
+	delete[] requireLevelRow;
+	delete[] avoidLevelRow;
+	
+	return satisfiableInGroups;
+}
+
+bool CSMatrix::checkDistinguishable(CSCol *csCol1, CSCol *csCol2) {
+	return checkOneWayDistinguishable(csCol1, csCol2) || checkOneWayDistinguishable(csCol2, csCol1);
+}
+
+bool CSMatrix::checkOneWayDistinguishable(CSCol *csCol1, CSCol *csCol2) {
+	
+	int factors = locatingArray->getFactors();
+	int nConGroups = locatingArray->getNConGroups();
+	ConstraintGroup **conGroups = locatingArray->getConGroups();
+	
+	char *requireLevelRow = new char[factors];
+	char *avoidLevelRow = new char[factors];
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		requireLevelRow[factor_i] = -1;
+		avoidLevelRow[factor_i] = -1;
+	}
+	
+	// set to require csCol1 settings
+	for (int setting_i = 0; setting_i < csCol1->factors; setting_i++) {
+		requireLevelRow[csCol1->setting[setting_i].factor_i] = csCol1->setting[setting_i].index;
+	}
+	
+	// at least one satisfying setting in csCol2 must be avoidable for every constraint group
+	bool settingExists = false;
+	
+	// try to avoid at least one csCol2 setting
+	for (int setting_i = 0; setting_i < csCol2->factors; setting_i++) {
+		// we are trying to avoid "csCol2->setting[setting_i].factor_i != csCol2->setting[setting_i].index" in this iteration
+		// we cannot require the setting we are trying to avoid
+		if (requireLevelRow[csCol2->setting[setting_i].factor_i] != csCol2->setting[setting_i].index) {
+			avoidLevelRow[csCol2->setting[setting_i].factor_i] = csCol2->setting[setting_i].index;
+			
+			// check if possible for every constraint group
+			bool satisfiableInGroups = true;
+			for (int conGroup_i = 0; conGroup_i < nConGroups; conGroup_i++) {
+				if (!conGroups[conGroup_i]->satisfiableInGroupLA(requireLevelRow, avoidLevelRow)) {
+					satisfiableInGroups = false;
+					break;
+				}
+			}
+			
+			if (satisfiableInGroups) {
+				settingExists = true;
+				break;
+			}
+			
+			avoidLevelRow[csCol2->setting[setting_i].factor_i] = -1;
+		}
+	}
+	
+	/* for factors not in a constraint group, simply set their settings in csCol1 to be ENTRY_A,
+	 and the check passes because the interaction cannot be only */
+	
+	// deallocate memory
+	delete[] requireLevelRow;
+	delete[] avoidLevelRow;
+	
+	return settingExists;
 }
 
 void CSMatrix::randomizeArray(CSCol **array) {
@@ -1478,13 +1938,13 @@ void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 	
 	// add the row to locating array
 	addRow(array, levelRow);
-	cout << "The matrix now has " << rows << " rows" << endl;
+//	cout << "The matrix now has " << rows << " rows" << endl;
 	
 	// smartly sort the array and score it
 	smartSort(array, rows - 1);
 	csScore = getArrayScore(array);
 	
-	cout << "Score after random non-finalized row: " << csScore << endl;
+//	cout << "Score after random non-finalized row: " << csScore << endl;
 	
 	// used to track duplicate columns in CS matrix
 	bool duplicate = false;
@@ -1617,7 +2077,7 @@ void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 		
 		// check if we found a better score
 		if (bestScore < csScore) {
-			cout << "Found better score! " << bestScore << endl;
+//			cout << "Found better score! " << bestScore << endl;
 			
 			// make the change to improve the score
 			int factor_i;
@@ -1646,7 +2106,7 @@ void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 		
 	}
 	
-	cout << "Score after finalized row: " << csScore << endl;
+//	cout << "Score after finalized row: " << csScore << endl;
 	
 	delete[] oldLevelRow;
 	delete[] newLevelRow;
@@ -1671,6 +2131,10 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 			streak = 0;
 		} else if (compare(array[col_i], array[col_i + 1], 0, rows) > 0) {
 			cout << "Mistake in array" << endl;
+		} else {
+			if (checkDistinguishable(array[col_i], array[col_i + 1])) {
+//				cout << "Duplicates found: " << getColName(array[col_i]) << " vs " << getColName(array[col_i + 1]) << endl;
+			}
 		}
 	}
 	
@@ -1679,6 +2143,39 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 	squaredSum += streak * streak;
 	
 	return (squaredSum - getCols());
+}
+
+long long int CSMatrix::getBruteForceArrayScore(CSCol **array, int k) {
+	long long int score = 0;
+	int differences;
+	
+	int indistinguishable = 0;
+	
+	for (int col_i1 = 0; col_i1 < getCols() - 1; col_i1++) {
+		for (int col_i2 = col_i1 + 1; col_i2 < getCols(); col_i2++) {
+			if (array[col_i1]->coverable && array[col_i2]->coverable) {
+				if (!checkDistinguishable(array[col_i1], array[col_i2])) {
+					cout << "Indistinguishable pair: " << getColName(array[col_i1]) << " vs " << getColName(array[col_i2]) << endl;
+					indistinguishable++;
+				}
+				
+				differences = 0;
+				
+				for (int row_i = 0; row_i < rows; row_i++) {
+					if (array[col_i1]->dataP[row_i] != array[col_i2]->dataP[row_i]) differences++;
+				}
+				
+				if (differences < k) {
+					score += (k - differences);
+				}
+			}
+		}
+	}
+	
+	cout << "Indistinguishable pairs: " << indistinguishable << endl;
+	cout << "Minimum score: " << (indistinguishable * k) << endl;
+	
+	return score;
 }
 
 void CSMatrix::writeResponse(string responseDir, string responseCol, int terms, float *coefficients, int *columns) {
@@ -1719,4 +2216,55 @@ void CSMatrix::writeResponse(string responseDir, string responseCol, int terms, 
 	// close the file
 	ofs.close();
 
+}
+
+CSMatrix::~CSMatrix() {
+	CSCol *csCol;
+	
+	// delete all mappings strategically
+	for (int t = locatingArray->getT(); t >= 0; t--) {
+		for (int col_i = 0; col_i < getCols(); col_i++) {
+			csCol = data->at(col_i);
+			
+			if (csCol->factors == t) {
+				Mapping *mappingTemp = mapping;
+				FactorSetting *setting;
+				for (int setting_i = 0; setting_i < t; setting_i++) {
+					setting = &csCol->setting[setting_i];
+					mappingTemp = mappingTemp->mapping[factorLevelMap[setting->factor_i][setting->index]];
+				}
+				
+				// deallocate mapping->mapping array
+				if (t == 1 && groupingInfo[setting->factor_i]->grouped && setting->index > 0 &&
+						groupingInfo[setting->factor_i]->levelGroups[setting->index] == groupingInfo[setting->factor_i]->levelGroups[setting->index - 1]) {
+					// This column is a main effect that is grouped with other main effects, but it is not the first main effect in its group.
+					// All main effects in a particular group have separate columns in the CS matrix and separate mapping structs but they share mapping->mapping arrays,
+					// because the main effects (although separate) are not differentiated in any interactions that they are included in.
+					// We only deallocate the mapping->mapping array for the first main effect in a group so as not to deallocate the same array more than once.
+					// We therefore ignore this main effect in terms of deallocating the mapping-mapping array.
+				} else if (mappingTemp->mapping != NULL) {
+					delete[] mappingTemp->mapping;
+				}
+				
+				// deallocate mapping struct
+				delete mappingTemp;
+			}
+		}
+	}
+	
+	// delete all csCols
+	for (int col_i = 0; col_i < getCols(); col_i++) {
+		csCol = data->at(col_i);
+		
+		delete[] csCol->setting;
+		delete csCol;
+	}
+	delete data;
+	
+	// delete factor-level map
+	for (int factor_i = 0; factor_i < locatingArray->getFactors(); factor_i++) {
+		delete[] factorLevelMap[factor_i];
+	}
+	delete[] factorLevelMap;
+	
 }

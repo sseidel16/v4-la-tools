@@ -1,6 +1,34 @@
 #include "LocatingArray.h"
 
-LocatingArray::LocatingArray(string file) {
+LocatingArray::LocatingArray(int factors, int *levelCounts) {
+	tests = 0;
+	
+	this->factors = factors;
+	
+	t = 1;
+	
+	factorGrouping = new GroupingInfo*[factors];
+	
+	// load the level counts and grouping for the factors
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		factorGrouping[factor_i] = new GroupingInfo();
+		factorGrouping[factor_i]->levels = levelCounts[factor_i];
+		
+		factorGrouping[factor_i]->grouped = false;
+		factorGrouping[factor_i]->levelGroups = NULL;
+		
+		factorGrouping[factor_i]->conGroup = NULL;
+		factorGrouping[factor_i]->conGroupIndex = -1;
+	}
+	
+	nConGroups = 0;
+	conGroups = new ConstraintGroup*[nConGroups];
+	
+	factorData = NULL;
+
+}
+
+LocatingArray::LocatingArray(string file, string factorDataFile) {
 	int tempData;
 	
 	ifstream ifs(file.c_str(), ifstream::in);
@@ -28,10 +56,6 @@ LocatingArray::LocatingArray(string file) {
 		ifs >> tempData;
 		factorGrouping[factor_i]->grouped = tempData;
 		
-		// load less than factor index
-		ifs >> tempData;
-		factorGrouping[factor_i]->lessThanFactor = tempData;
-		
 		// check grouping
 		if (factorGrouping[factor_i]->grouped) {
 			// allocate array for level grouping
@@ -45,6 +69,25 @@ LocatingArray::LocatingArray(string file) {
 		} else {
 			factorGrouping[factor_i]->levelGroups = NULL;
 		}
+		
+		factorGrouping[factor_i]->conGroup = NULL;
+		factorGrouping[factor_i]->conGroupIndex = -1;
+	}
+	
+	// load factor data (must be done before constraint groups)
+	if (factorDataFile == "") {
+		factorData = new FactorData(getGroupingInfo(), getFactors());
+	} else {
+		factorData = new FactorData(factorDataFile);
+	}
+	
+	// load constraint groups
+	ifs >> nConGroups;
+	conGroups = new ConstraintGroup*[nConGroups];
+	
+	// load each constraint group
+	for (int iConGroup = 0; iConGroup < nConGroups; iConGroup++) {
+		conGroups[iConGroup] = new ConstraintGroup(this, ifs);
 	}
 	
 	// load the tests now
@@ -97,6 +140,14 @@ int LocatingArray::getT() {
 	return t;
 }
 
+int LocatingArray::getNConGroups() {
+	return nConGroups;
+}
+
+ConstraintGroup **LocatingArray::getConGroups() {
+	return conGroups;
+}
+
 void LocatingArray::writeToFile(string file) {
 	
 	ofstream ofs(file.c_str());
@@ -115,15 +166,12 @@ void LocatingArray::writeToFile(string file) {
 		// load grouped bool
 		ofs << factorGrouping[factor_i]->grouped << "\t";
 		
-		// load less than factor index
-		ofs << factorGrouping[factor_i]->lessThanFactor << "\t";
-		
 		// check grouping
 		if (factorGrouping[factor_i]->grouped) {
 		
 			for (int level_i = 0; level_i < factorGrouping[factor_i]->levels; level_i++) {
 				// write level group
-				ofs << factorGrouping[factor_i]->levelGroups[level_i] << "\t";
+				ofs << (int)factorGrouping[factor_i]->levelGroups[level_i] << "\t";
 			}
 		}
 		ofs << endl;
@@ -141,4 +189,35 @@ void LocatingArray::writeToFile(string file) {
 	
 	ofs.close();
 	
+}
+
+FactorData *LocatingArray::getFactorData() {
+	return factorData;
+}
+
+LocatingArray::~LocatingArray() {
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		if (factorGrouping[factor_i]->grouped) {
+			delete[] factorGrouping[factor_i]->levelGroups;
+		}
+		
+		delete factorGrouping[factor_i];
+	}
+	delete[] factorGrouping;
+
+	// deallocate the factor data if it exists
+	if (factorData != NULL) {
+		delete factorData;
+	}
+	
+	for (int iConGroup = 0; iConGroup < nConGroups; iConGroup++) {
+		delete conGroups[iConGroup];
+	}
+	delete[] conGroups;
+	
+	while (tests > 0) {
+		char *levelRow = remLevelRow();
+		
+		delete[] levelRow;
+	}
 }
