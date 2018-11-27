@@ -321,7 +321,7 @@ void CSMatrix::reorderRows(int k, int c) {
 		pathLAChecker(array, path, path, 0, k, score, settingToResample, rowContributions);
 		minCountCheck(array, c, score, settingToResample, rowContributions);
 		
-		cout << "Score: " << score << ": " << getArrayScore(array) << endl;
+		cout << "Score: " << score;
 		
 		int swaps = 0;
 		while (true) {
@@ -363,7 +363,7 @@ void CSMatrix::reorderRows(int k, int c) {
 			
 		}
 		
-		cout << "Swaps: " << swaps << endl;
+		cout << "\tSwaps: " << swaps << endl;
 		if (swaps == 0) break;
 	}
 	
@@ -2130,7 +2130,7 @@ long long int CSMatrix::getArrayScore(CSCol **array) {
 			squaredSum += streak * streak;
 			streak = 0;
 		} else if (compare(array[col_i], array[col_i + 1], 0, rows) > 0) {
-			cout << "Mistake in array" << endl;
+			cout << "Mistake in CS matrix at column: " << col_i << endl;
 		} else {
 			if (checkDistinguishable(array[col_i], array[col_i + 1])) {
 //				cout << "Duplicates found: " << getColName(array[col_i]) << " vs " << getColName(array[col_i + 1]) << endl;

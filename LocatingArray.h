@@ -11,6 +11,8 @@
 
 using namespace std;
 
+const string laVersion = "v2.0";
+
 class ConstraintGroup;
 class FactorData;
 

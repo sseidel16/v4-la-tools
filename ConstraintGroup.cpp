@@ -200,6 +200,22 @@ void ConstraintGroup::randPopulateLevelRow(char *levelRow) {
 	}
 }
 
+void ConstraintGroup::writeToStream(ofstream &ofs) {
+	// write constraint group factors
+	ofs << factors;
+	for (int factor_i = 0; factor_i < factors; factor_i++) {
+		ofs << "\t" << factorIndeces[factor_i];
+	}
+	ofs << endl;
+	
+	// write constraints
+	ofs << constraints;
+	for (int constraint_i = 0; constraint_i < constraints; constraint_i++) {
+		boolConstraints[constraint_i]->writeToStream(ofs);
+		ofs << endl;
+	}
+}
+
 ConstraintGroup::~ConstraintGroup() {
 	delete[] weightMin;
 	delete[] weightMax;
@@ -273,6 +289,12 @@ bool EqResult::getResult(int test) {
 	return floatResult1->getResult(test) == floatResult2->getResult(test);
 }
 
+void EqResult::writeToStream(ofstream &ofs) {
+	ofs << "\t==";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
+}
+
 EqResult::~EqResult() {
 	delete floatResult1;
 	delete floatResult2;
@@ -285,6 +307,12 @@ LtEqResult::LtEqResult(LocatingArray *array, ifstream &ifs): BoolResult(array) {
 
 bool LtEqResult::getResult(int test) {
 	return floatResult1->getResult(test) <= floatResult2->getResult(test);
+}
+
+void LtEqResult::writeToStream(ofstream &ofs) {
+	ofs << "\t<=";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
 }
 
 LtEqResult::~LtEqResult() {
@@ -301,6 +329,12 @@ bool GtResult::getResult(int test) {
 	return floatResult1->getResult(test) > floatResult2->getResult(test);
 }
 
+void GtResult::writeToStream(ofstream &ofs) {
+	ofs << "\t>";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
+}
+
 GtResult::~GtResult() {
 	delete floatResult1;
 	delete floatResult2;
@@ -313,6 +347,12 @@ IfResult::IfResult(LocatingArray *array, ifstream &ifs): BoolResult(array) {
 
 bool IfResult::getResult(int test) {
 	return !boolResult1->getResult(test) || boolResult2->getResult(test);
+}
+
+void IfResult::writeToStream(ofstream &ofs) {
+	ofs << "\tIF";
+	boolResult1->writeToStream(ofs);
+	boolResult2->writeToStream(ofs);
 }
 
 IfResult::~IfResult() {
@@ -329,6 +369,12 @@ float AdditionResult::getResult(int test) {
 	return floatResult1->getResult(test) + floatResult2->getResult(test);
 }
 
+void AdditionResult::writeToStream(ofstream &ofs) {
+	ofs << "\t+";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
+}
+
 AdditionResult::~AdditionResult() {
 	delete floatResult1;
 	delete floatResult2;
@@ -341,6 +387,12 @@ MultiplicationResult::MultiplicationResult(LocatingArray *array, ifstream &ifs):
 
 float MultiplicationResult::getResult(int test) {
 	return floatResult1->getResult(test) * floatResult2->getResult(test);
+}
+
+void MultiplicationResult::writeToStream(ofstream &ofs) {
+	ofs << "\t*";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
 }
 
 MultiplicationResult::~MultiplicationResult() {
@@ -357,6 +409,12 @@ float DivisionResult::getResult(int test) {
 	return floatResult1->getResult(test) / floatResult2->getResult(test);
 }
 
+void DivisionResult::writeToStream(ofstream &ofs) {
+	ofs << "\t/";
+	floatResult1->writeToStream(ofs);
+	floatResult2->writeToStream(ofs);
+}
+
 DivisionResult::~DivisionResult() {
 	delete floatResult1;
 	delete floatResult2;
@@ -370,10 +428,18 @@ float ConstantResult::getResult(int test) {
 	return value;
 }
 
+void ConstantResult::writeToStream(ofstream &ofs) {
+	ofs << "\tC\t" << value;
+}
+
 FactorAssignment::FactorAssignment(LocatingArray *array, ifstream &ifs): FloatResult(array) {
 	ifs >> factor_i;
 }
 
 float FactorAssignment::getResult(int test) {
 	return array->getFactorData()->getNumericFactorLevel(factor_i, array->getLevelMatrix()[test][factor_i]);
+}
+
+void FactorAssignment::writeToStream(ofstream &ofs) {
+	ofs << "\tF\t" << factor_i;
 }

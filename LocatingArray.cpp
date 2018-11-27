@@ -30,8 +30,18 @@ LocatingArray::LocatingArray(int factors, int *levelCounts) {
 
 LocatingArray::LocatingArray(string file, string factorDataFile) {
 	int tempData;
+	string tempString;
 	
 	ifstream ifs(file.c_str(), ifstream::in);
+	
+	// verify version
+	ifs >> tempString;
+	if (tempString != laVersion) {
+		cout << "LA version must be " << laVersion << " for this software" << endl;
+		cout << "But instead found: " << tempString << endl;
+		cout << "Exiting" << endl;
+		exit(0);
+	}
 	
 	// read the first 2 lines of locating array
 	ifs >> tests;
@@ -152,6 +162,9 @@ void LocatingArray::writeToFile(string file) {
 	
 	ofstream ofs(file.c_str());
 	
+	// write version
+	ofs << laVersion << endl;
+	
 	// initial tests and factors
 	ofs << tests << "\t" << factors << endl;
 	
@@ -175,6 +188,12 @@ void LocatingArray::writeToFile(string file) {
 			}
 		}
 		ofs << endl;
+	}
+	
+	// write constraint groups
+	ofs << nConGroups << endl;
+	for (int iConGroup = 0; iConGroup < nConGroups; iConGroup++) {
+		conGroups[iConGroup]->writeToStream(ofs);
 	}
 	
 	// write the tests now

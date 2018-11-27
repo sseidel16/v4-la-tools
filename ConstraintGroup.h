@@ -18,9 +18,10 @@ protected:
 public:
 	BoolResult(LocatingArray *array);
 	
-	virtual bool getResult(int test) = 0;
-	
 	static BoolResult *readBoolResult(LocatingArray *array, ifstream &ifs);
+	
+	virtual bool getResult(int test) = 0;
+	virtual void writeToStream(ofstream &ofs) = 0;
 	
 	virtual ~BoolResult();
 };
@@ -34,6 +35,7 @@ public:
 	static FloatResult *readFloatResult(LocatingArray *array, ifstream &ifs);
 	
 	virtual float getResult(int test) = 0;
+	virtual void writeToStream(ofstream &ofs) = 0;
 	
 	virtual ~FloatResult();
 };
@@ -58,6 +60,7 @@ public:
 	bool satisfiableInGroupLA(char *requireLevelRow, char *avoidLevelRow);
 	virtual bool getResult(int test);
 	void randPopulateLevelRow(char *levelRow);
+	void writeToStream(ofstream &ofs);
 	
 	virtual ~ConstraintGroup();
 };
@@ -69,6 +72,7 @@ private:
 public:
 	EqResult(LocatingArray *array, ifstream &ifs);
 	virtual bool getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~EqResult();
 };
 
@@ -79,6 +83,7 @@ private:
 public:
 	LtEqResult(LocatingArray *array, ifstream &ifs);
 	virtual bool getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~LtEqResult();
 };
 
@@ -89,6 +94,7 @@ private:
 public:
 	GtResult(LocatingArray *array, ifstream &ifs);
 	virtual bool getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~GtResult();
 };
 
@@ -99,6 +105,7 @@ private:
 public:
 	IfResult(LocatingArray *array, ifstream &ifs);
 	virtual bool getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~IfResult();
 };
 
@@ -109,6 +116,7 @@ private:
 public:
 	AdditionResult(LocatingArray *array, ifstream &ifs);
 	virtual float getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~AdditionResult();
 };
 
@@ -119,6 +127,7 @@ private:
 public:
 	MultiplicationResult(LocatingArray *array, ifstream &ifs);
 	virtual float getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~MultiplicationResult();
 };
 
@@ -129,6 +138,7 @@ private:
 public:
 	DivisionResult(LocatingArray *array, ifstream &ifs);
 	virtual float getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 	virtual ~DivisionResult();
 };
 
@@ -138,6 +148,7 @@ private:
 public:
 	ConstantResult(LocatingArray *array, ifstream &ifs);
 	float getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 };
 
 class FactorAssignment: public FloatResult {
@@ -146,6 +157,7 @@ private:
 public:
 	FactorAssignment(LocatingArray *array, ifstream &ifs);
 	float getResult(int test);
+	virtual void writeToStream(ofstream &ofs);
 };
 
 #endif
