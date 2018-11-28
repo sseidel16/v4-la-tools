@@ -4,11 +4,28 @@ This software can perform analysis or generate locating arrays.
 
 All commands are from the bash shell within the main directory.
 
+Locating array examples are included in the LA/ directory.
+Locating array format used by the software has changed over time, and a version on the first line of the LA is required for the software to accept it.
+The LA version used by the software can be found in the LocatingArray.h header file.
+Not all LAs in the LA/ directory use the latest version format (most use earlier versions at the time of writing).
+This software only ckecks the first line of a LA to protect from version mistakes, and then assumes any LA passed as an argument is a correctly formatted locating array.
+If a wrongly formatted locating array is passed to the software, undefined behavior will occur; often the software simply crashes.
+The software is NOT tolerant to any mistakes in LA format.
+
 COMPILE:
 A Makefile exists for compilation. Simply type:
 $ make
 If any errors occur, you can clean with:
 $ make clean
+
+SEARCH:
+Usage: ./Search [LocatingArray.tsv] ([FactorData.tsv]) ...
+Compilation generates an executable that can be run using ./Search.
+The executable requires, in general, 2 files: a locating array (LA) file and a factor data (FD) file.
+The LA file uses factor and level indices that can be decoded by the FD file.
+In addition, the FD file indicates if factors have numeric levels (useful for constraints) and what the float values are for each level.
+Optionally, an empty string ("") can be provided instead of a FD file, and the software will assign all factors and (non-numeric) levels generic names (F0, F1, L0, L1...).
+The seed used for all random samples throughout execution is obtained from the current time and printed immediately after execution begins.
 
 ANALYSIS:
 The analysis part of the software requires a valid locating array file, factor data file, and responses directory.
