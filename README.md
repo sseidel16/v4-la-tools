@@ -39,6 +39,9 @@ You can execute it by typing:
 $ ./Search [LocatingArray.tsv] ([FactorData.tsv]) analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
 ```
 
+## CHECKLA
+This section checks a LA file for a required separation and a minimum count for every interaction.
+
 ## FIXLA
 (NOT tested extensively with groupings but SHOULD work)
 This section fixes broken locating arrays by successively adding more rows.
@@ -47,7 +50,7 @@ The software will print lower and lower scores until it reaches 0 and the valid 
 Pros: creates a LA by definition
 Cons: the LAs may barely be valid
 ```
-$ ./Search [LocatingArray.tsv] [FactorData.tsv] fixla [FixedOutputLA.tsv]
+$ ./Search [LocatingArray.tsv] ([FactorData.tsv]) fixla [FixedOutputLA.tsv]
 ```
 
 ## MTFIXLA
@@ -66,11 +69,18 @@ Rows at the bottom often have 0 contribution and can be completely removed.
 The generated output LA does not remove any rows but simply reorders them, and the console indicates which rows have contributions.
 
 ## Examples
-The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well):
+The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well).
 ```
-./Search LA_LARGE.tsv Factors_LARGE.tsv analysis responses_LARGE Throughput 1 13 50 50
+./Search LA/LA_LARGE.tsv FD/Factors_LARGE.tsv analysis RE/responses_LARGE Throughput 1 13 50 50
 ```
-The following creates a locating array for the LARGE simulated dataset:
+The following creates a locating array for the LARGE simulated dataset.
 ```
-$ ./Search LA_LARGE_HEADER.tsv Factors_LARGE.tsv fixla OUT.tsv
+$ ./Search LA/LA_LARGE_HEADER.tsv FD/Factors_LARGE.tsv fixla OUT.tsv
+```
+The following check a LA that contains constraint groups, and check a LA for the LARGE simulated dataset.
+The first requires its corresponding FD file because it uses constraints and numeric levels for its factors.
+The second does not required its corresponding FD file because no factors have numeric levels for constraints and the LA can be checked without knowing the names of factors and levels.
+```
+./Search LA/LA_LARGE.tsv FD/Factors_LARGE.tsv analysis RE/responses_LARGE Throughput 1 13 50 50
+./Search LA/LA_LARGE.tsv "" checkla 1 3
 ```
