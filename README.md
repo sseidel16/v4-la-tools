@@ -55,14 +55,18 @@ The randomization follows the Moser-Tardos idea.
 A special variable k specifies how many differences are required for every pair of columns in the CS matrix.
 This then produces stronger LAs.
 
-REORDERROWSLA:
+## REORDERROWSLA
 Reorder rows in LA by contributions.
 Rows at the top of the LA are the ones contributing most.
 Rows at the bottom often have 0 contribution and can be completely removed.
 Under development...
 
-Examples:
+## Examples
 The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well):
+```
 ./Search LA_LARGE.tsv Factors_LARGE.tsv analysis responses_LARGE Throughput 1 13 50 50
+```
 The following creates a locating array for the LARGE simulated dataset:
+```
 $ ./Search LA_LARGE_HEADER.tsv Factors_LARGE.tsv fixla OUT.tsv
+```
