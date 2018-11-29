@@ -12,35 +12,44 @@ This software only ckecks the first line of a LA to protect from version mistake
 If a wrongly formatted locating array is passed to the software, undefined behavior will occur; often the software simply crashes.
 The software is NOT tolerant to any mistakes in LA format.
 
-COMPILE:
+## COMPILE
 A Makefile exists for compilation. Simply type:
+```
 $ make
+```
 If any errors occur, you can clean with:
+```
 $ make clean
+```
 
-SEARCH:
-Usage: ./Search [LocatingArray.tsv] ([FactorData.tsv]) ...
-Compilation generates an executable that can be run using ./Search.
+## SEARCH
+Usage: `./Search [LocatingArray.tsv] ([FactorData.tsv]) ...`
+Compilation generates an executable that can be run using `./Search`.
 The executable requires, in general, 2 files: a locating array (LA) file and a factor data (FD) file.
 The LA file uses factor and level indices that can be decoded by the FD file.
 In addition, the FD file indicates if factors have numeric levels (useful for constraints) and what the float values are for each level.
 Optionally, an empty string ("") can be provided instead of a FD file, and the software will assign all factors and (non-numeric) levels generic names (F0, F1, L0, L1...).
 The seed used for all random samples throughout execution is obtained from the current time and printed immediately after execution begins.
 
-ANALYSIS:
+## ANALYSIS
 The analysis part of the software requires a valid locating array file, factor data file, and responses directory.
 You can execute it by typing:
+```
 $ ./Search [LocatingArray.tsv] [FactorData.tsv] analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
+```
 
-FIXLA: (NOT tested extensively with groupings but SHOULD work)
+## FIXLA
+(NOT tested extensively with groupings but SHOULD work)
 This section fixes broken locating arrays by successively adding more rows.
 A score of the array is kept (lower is better, 0 is valid locating array).
 The software will print lower and lower scores until it reaches 0 and the valid locating array will be written to a file.
 Pros: creates a LA by definition
 Cons: the LAs may barely be valid
+```
 $ ./Search [LocatingArray.tsv] [FactorData.tsv] fixla [FixedOutputLA.tsv]
+```
 
-MTFIXLA:
+## MTFIXLA
 This section fixes broken locating arrays by adding chunks of rows and randomizing them.
 The randomization follows the Moser-Tardos idea.
 A special variable k specifies how many differences are required for every pair of columns in the CS matrix.
