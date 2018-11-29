@@ -32,10 +32,11 @@ Optionally, an empty string ("") can be provided instead of a FD file, and the s
 The seed used for all random samples throughout execution is obtained from the current time and printed immediately after execution begins.
 
 ## ANALYSIS
+Usage: `... analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]`
 The analysis part of the software requires a valid locating array file, factor data file, and responses directory.
 You can execute it by typing:
 ```
-$ ./Search [LocatingArray.tsv] [FactorData.tsv] analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
+$ ./Search [LocatingArray.tsv] ([FactorData.tsv]) analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
 ```
 
 ## FIXLA
@@ -56,10 +57,13 @@ A special variable k specifies how many differences are required for every pair 
 This then produces stronger LAs.
 
 ## REORDERROWSLA
+Usage: `... reorderrowsla [k Separation] [c Minimum Count] [ReorderedOutputLA.tsv]`
+The argument k indicates the separation for the LA, and c indicates the minimum number of times each interaction must be covered.
 Reorder rows in LA by contributions.
+A contribution in a row is either interactions that differ when they have not already differed k times, or an interaction that is covered whenit has not already been covered c times.
 Rows at the top of the LA are the ones contributing most.
 Rows at the bottom often have 0 contribution and can be completely removed.
-Under development...
+The generated output LA does not remove any rows but simply reorders them, and the console indicates which rows have contributions.
 
 ## Examples
 The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well):
