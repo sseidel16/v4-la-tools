@@ -34,21 +34,30 @@ The seed used for all random samples throughout execution is obtained from the c
 ## ANALYSIS
 Usage: `... analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]`
 The analysis part of the software requires a valid locating array file, factor data file, and responses directory.
+Analysis runs at a high level in `Search.cpp`, but it calls functions in `Model.cpp`.
+It uses least squares to fit models, specifically QR decomposition, and this is all coded into `Model.cpp`.
 You can execute it by typing:
 ```
 $ ./Search [LocatingArray.tsv] ([FactorData.tsv]) analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]
 ```
 
 ## CHECKLA
+Usage: `... checkla [k Separation] [c Minimum Count]`
 This section checks a LA file for a required separation and a minimum count for every interaction.
+It performs three main checks.
+First is a path check that uses the usual scoring for k separation and c minimum count.
+Second is a weird scoring method that was originally used with FIXLA.
+Third is a brute force check that produces the exact same score as the path check (at least it should, and it has for every LA I have checked).
+I have not removed brute force because I am not 100% sure path check does not have some edge case bug and I want to spot it easily if it pops up.
+However, it is placed last because it takes a long time and execution can simply be terminated anytime that somebody does not want to wait that long.
 
 ## FIXLA
-(NOT tested extensively with groupings but SHOULD work)
-This section fixes broken locating arrays by successively adding more rows.
+Usage: `... fixla [FixedOutputLA.tsv]`
+This section fixes broken locating arrays by successively adding more rows using the inital greedy construction approach in my thesis.
 A score of the array is kept (lower is better, 0 is valid locating array).
 The software will print lower and lower scores until it reaches 0 and the valid locating array will be written to a file.
-Pros: creates a LA by definition
-Cons: the LAs may barely be valid
+Pros: creates a LA by definition, the LA is smaller than from other approaches, it is constructed fairly quickly.
+Cons: the LA may barely be valid, does not incorporate separation or a minimum count for each interaction, cannot be used with constraints.
 ```
 $ ./Search [LocatingArray.tsv] ([FactorData.tsv]) fixla [FixedOutputLA.tsv]
 ```

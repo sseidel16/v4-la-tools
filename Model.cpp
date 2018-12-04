@@ -70,18 +70,6 @@ Model::Model(Model *model) {
 	}
 }
 
-/*
-
-	Procedure:
-	
-	Priority queue begins with 1 model: the model with no terms but an intercept.
-	At every iteration, the models are pulled out of the queue, one by one, and
-	the top (n) terms are taken, one at a time, based on the distance to residuals.
-	For every term, it is added to the current model and r-squared is calculated.
-	The new model is then placed in the next priority queue. This process stops
-	when the model
-
-*/
 void Model::printModelFactors() {
 	int factor1i, factor2i, level1, level2;
 	

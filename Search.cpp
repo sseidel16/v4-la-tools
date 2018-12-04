@@ -221,6 +221,21 @@ void deallocateOccurrences(Occurrence *occurrence, int factors) {
 	
 }
 
+/*
+	ANALYSIS Procedure:
+	
+	Priority queue begins with 1 model: the model with no terms but an intercept.
+	At every iteration, the models are pulled out of the queue, one by one, and for each,
+	the top (n) terms are taken, one at a time, based on the distance to residuals.
+	For every term, it is added to the current model and r-squared is calculated.
+	The new model is then placed in the next priority queue. This process stops
+	when all models have as many terms as maxTerms. Each model taken out of the queue
+	produces newModels_n new models that are added to the next queue. The queues are
+	then priority queues (by model R^2) with a maximum number of models. The same model
+	(with the same terms) can be generated in multiple ways, and in this case, duplicates
+	will not be added and the function below prints "Duplicate Model!!!".
+
+*/
 void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *csMatrix,
 					int maxTerms, int models_n, int newModels_n) {
 	cout << "Creating Models..." << endl;
