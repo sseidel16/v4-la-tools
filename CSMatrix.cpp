@@ -640,6 +640,7 @@ void CSMatrix::autoFindRows(int k, int c, int startRows) {
 	cout << "Finished with array containing (" << lowerBound << ":" << upperBound << ") rows!" << endl;
 	
 	deletePath(path);
+	delete[] array;
 	
 }
 
@@ -1938,7 +1939,7 @@ void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 	
 	// add the row to locating array
 	addRow(array, levelRow);
-//	cout << "The matrix now has " << rows << " rows" << endl;
+	cout << "The matrix now has " << rows << " rows" << endl;
 	
 	// smartly sort the array and score it
 	smartSort(array, rows - 1);
@@ -2106,7 +2107,7 @@ void CSMatrix::addRowFix(CSCol **array, long long int &csScore) {
 		
 	}
 	
-//	cout << "Score after finalized row: " << csScore << endl;
+	cout << "Score after finalized row: " << csScore << endl;
 	
 	delete[] oldLevelRow;
 	delete[] newLevelRow;
