@@ -43,6 +43,7 @@ $ ./Search [LocatingArray.tsv] ([FactorData.tsv]) analysis [ResponsesDirectory] 
 
 ## CHECKLA
 Usage: `... checkla [k Separation] [c Minimum Count]`
+
 This section checks a LA file for a required separation and a minimum count for every interaction.
 It performs three main checks.
 First is a path check that uses the usual scoring for k separation and c minimum count.
@@ -53,6 +54,7 @@ However, it is placed last because it takes a long time and execution can simply
 
 ## FIXLA
 Usage: `... fixla [FixedOutputLA.tsv]`
+
 This section fixes broken locating arrays by successively adding more rows using the inital greedy construction approach in my thesis.
 A score of the array is kept (lower is better, 0 is valid locating array).
 The software will print lower and lower scores until it reaches 0 and the valid locating array will be written to a file.
@@ -70,6 +72,7 @@ This then produces stronger LAs.
 
 ## REORDERROWSLA
 Usage: `... reorderrowsla [k Separation] [c Minimum Count] [ReorderedOutputLA.tsv]`
+
 The argument k indicates the separation for the LA, and c indicates the minimum number of times each interaction must be covered.
 Reorder rows in LA by contributions.
 A contribution in a row is either interactions that differ when they have not already differed k times, or an interaction that is covered whenit has not already been covered c times.
