@@ -24,6 +24,7 @@ $ make clean
 
 ## SEARCH
 Usage: `./Search [LocatingArray.tsv] ([FactorData.tsv]) ...`
+
 Compilation generates an executable that can be run using `./Search`.
 The executable requires, in general, 2 files: a locating array (LA) file and a factor data (FD) file.
 The LA file uses factor and level indices that can be decoded by the FD file.
@@ -33,6 +34,7 @@ The seed used for all random samples throughout execution is obtained from the c
 
 ## ANALYSIS
 Usage: `... analysis [ResponsesDirectory] [response_column] [1/0 - perform log on responses] [nTerms] [nModels] [nNewModels]`
+
 The analysis part of the software requires a valid locating array file, factor data file, and responses directory.
 Analysis runs at a high level in `Search.cpp`, but it calls functions in `Model.cpp`.
 It uses least squares to fit models, specifically QR decomposition, and this is all coded into `Model.cpp`.
