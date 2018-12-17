@@ -77,6 +77,15 @@ Rows at the top of the LA are the ones contributing most.
 Rows at the bottom often have 0 contribution and can be completely removed.
 The generated output LA does not remove any rows but simply reorders them, and the console indicates which rows have contributions.
 
+## CNERT LA Commands
+The first analysis command below is for MOS and the second is for Exposure.
+A log is used with Exposure, but no log command is given to the analysis because the log has already been taken in the response file.
+This differs from throughput in Abraham's LA where no log is taken in the response file so a log must be taken by the analysis software.
+```
+./Search LA/LA_SMALL.tsv FD/Factors_SMALL.tsv analysis RE/responses_SMALL MOS 0 11 50 50
+./Search LA/LA_SMALL.tsv FD/Factors_SMALL.tsv analysis RE/responses_SMALL Exposure 0 11 50 50
+```
+
 ## Examples
 The following performs analysis on the LARGE simulated dataset (13 factors per model) (50 and 50 works pretty well).
 ```
