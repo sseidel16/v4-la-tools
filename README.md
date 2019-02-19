@@ -1,4 +1,4 @@
-# v4_analysis
+# v4-la-tools
 
 This software can perform analysis or generate locating arrays.
 
