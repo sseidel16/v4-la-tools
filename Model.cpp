@@ -1,8 +1,3 @@
-
-#include <iostream>
-#include <iomanip>
-
-#include "LocatingArray.h"
 #include "Model.h"
 
 using namespace std;
@@ -107,6 +102,9 @@ void Model::leastSquares() {
 	// used when accessing CS Matrix
 	CSCol *csCol;
 	
+	// used when accessing the master design matrix
+	float *designCol;
+	
 	// used when looping through term indices
 	TermIndex *pTermIndex;
 	
@@ -116,14 +114,50 @@ void Model::leastSquares() {
 		return;
 	}
 	
+	// hydrate design matrix (is hydrate the right word? I like it)
+	pTermIndex = hTermIndex;
+	for (int col_i = 0; col_i < terms; col_i++) {
+		if (workSpace->designMatrix[pTermIndex->termIndex] == NULL) {
+			char **levelMatrix = csMatrix->getLocatingArray()->getLevelMatrix();
+			
+			csCol = csMatrix->getCol(pTermIndex->termIndex);
+			
+			// allocate some memory for this column of the design matrix and populate it
+			designCol = new float[tests];
+			
+			bool rowData;
+			for (int row_i = 0; row_i < tests; row_i++) {	// populate every row
+				
+				rowData = true; // start with true, perform AND operation
+				
+				for (int setting_i = 0; setting_i < csCol->factors; setting_i++) {
+					
+					// swap it around if needed
+					if (levelMatrix[row_i][csCol->setting[setting_i].factor_i] >=
+							csCol->setting[setting_i].index &&
+						levelMatrix[row_i][csCol->setting[setting_i].factor_i] <
+							csCol->setting[setting_i].index + csCol->setting[setting_i].levelsInGroup) {
+						rowData = !rowData;
+					}
+					
+				}
+				
+				designCol[row_i] = (rowData ? ENTRY_A : ENTRY_B);
+			}
+			workSpace->designMatrix[pTermIndex->termIndex] = designCol;
+		}
+		
+		pTermIndex = pTermIndex->next;
+	}
+	
 	// do QR here (column by column)
 	pTermIndex = hTermIndex;
 	for (int col_i = 0; col_i < terms; col_i++) {
 		
-		csCol = csMatrix->getCol(pTermIndex->termIndex);
+		designCol = workSpace->designMatrix[pTermIndex->termIndex];
 		// assign initial column A[col_i] to work vector
 		for (int row_i = 0; row_i < tests; row_i++) {
-			workSpace->workVec[row_i] = csCol->dataP[row_i];
+			workSpace->workVec[row_i] = designCol[row_i];
 		}
 		
 		// subtract appropriate other vectors
@@ -132,7 +166,7 @@ void Model::leastSquares() {
 			// find the dot product of A[:][col_i] and Q[:][row_i]
 			dotProd = 0;
 			for (int dotrow_i = 0; dotrow_i < tests; dotrow_i++)
-				dotProd += csCol->dataP[dotrow_i] * workSpace->dataQ[dotrow_i][row_i];
+				dotProd += designCol[dotrow_i] * workSpace->dataQ[dotrow_i][row_i];
 			
 			// assign the dot product to the R matrix
 			workSpace->dataR[row_i][col_i] = dotProd;
@@ -244,9 +278,9 @@ void Model::leastSquares() {
 	// find model response
 	pTermIndex = hTermIndex;
 	for (int term_i = 0; term_i < terms; term_i++) {
-		csCol = csMatrix->getCol(pTermIndex->termIndex);
+		designCol = workSpace->designMatrix[pTermIndex->termIndex];
 		for (int row_i = 0; row_i < tests; row_i++) {
-			modelResponse[row_i] += csCol->dataP[row_i] * coefVec[term_i];
+			modelResponse[row_i] += designCol[row_i] * coefVec[term_i];
 		}
 		pTermIndex = pTermIndex->next;
 	}
@@ -350,22 +384,27 @@ int Model::getTerms() {
 }
 
 // static
-void Model::setupWorkSpace(int rows, int cols) {
+void Model::setupWorkSpace(int rows, int modelCols, int csCols) {
 	// allocate initial memory
 	workSpace = new WorkSpace;
 	
 	// allocate memory for Q
 	workSpace->dataQ = new float*[rows];
 	for (int row_i = 0; row_i < rows; row_i++)
-		workSpace->dataQ[row_i] = new float[cols];
+		workSpace->dataQ[row_i] = new float[modelCols];
 	
 	// allocate memory for R
-	workSpace->dataR = new float*[cols];
-	for (int row_i = 0; row_i < cols; row_i++)
-		workSpace->dataR[row_i] = new float[cols];
+	workSpace->dataR = new float*[modelCols];
+	for (int row_i = 0; row_i < modelCols; row_i++)
+		workSpace->dataR[row_i] = new float[modelCols];
 	
 	// allocate memory for work vector
 	workSpace->workVec = new float[rows];
+	
+	// allocate memory for design matrix
+	workSpace->designMatrix = new float*[csCols];
+	for (int col_i = 0; col_i < csCols; col_i++)
+		workSpace->designMatrix[col_i] = NULL;
 }
 
 void Model::countOccurrences(Occurrence *occurrence) {

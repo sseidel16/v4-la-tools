@@ -20,6 +20,9 @@
 #include "Occurrence.h"
 #include "VectorXf.h"
 
+#define ENTRY_A		1
+#define ENTRY_B		-1
+
 using namespace std;
 
 struct FactorSetting {
@@ -134,6 +137,8 @@ private:
 	
 public:
 	CSMatrix(LocatingArray *locatingArray);
+	
+	LocatingArray *getLocatingArray();
 	
 	int getRows();
 	int getCols();

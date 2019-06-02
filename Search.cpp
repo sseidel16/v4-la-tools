@@ -239,7 +239,7 @@ void deallocateOccurrences(Occurrence *occurrence, int factors) {
 void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *csMatrix,
 					int maxTerms, int models_n, int newModels_n) {
 	cout << "Creating Models..." << endl;
-	Model::setupWorkSpace(response->getLength(), maxTerms);
+	Model::setupWorkSpace(response->getLength(), maxTerms, csMatrix->getCols());
 	
 	// work variables
 	Model *model;		// current model we are working on

@@ -1,8 +1,5 @@
 #include "CSMatrix.h"
 
-#define ENTRY_A		1
-#define ENTRY_B		-1
-
 #ifdef __MACH__
 #include <mach/clock.h>
 #include <mach/mach.h>
@@ -138,6 +135,10 @@ CSMatrix::CSMatrix(LocatingArray *locatingArray) {
 	
 	cout << "Finished constructing CS Matrix" << endl;
 	
+}
+
+LocatingArray *CSMatrix::getLocatingArray() {
+	return locatingArray;
 }
 
 void CSMatrix::addRow(CSCol *csCol) {

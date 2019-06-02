@@ -1,6 +1,9 @@
 #ifndef MODEL_H
 #define MODEL_H
 
+#include <iostream>
+#include <iomanip>
+
 #include "CSMatrix.h"
 #include "LocatingArray.h"
 #include "Occurrence.h"
@@ -12,6 +15,8 @@ typedef struct WorkSpace {
 	float **dataR;
 	
 	float *workVec;
+	
+	float **designMatrix;
 } WorkSpace;
 
 typedef struct TermIndex {
@@ -91,7 +96,7 @@ public:
 	~Model();
 	
 	// static: setup the global workspace
-	static void setupWorkSpace(int rows, int cols);
+	static void setupWorkSpace(int rows, int modelCols, int csCols);
 };
 
 #endif
