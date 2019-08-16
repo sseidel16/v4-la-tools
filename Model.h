@@ -49,6 +49,11 @@ private:
 	// actual response of the model
 	float *modelResponse;
 	
+	// indicates the number of times this model occurs (increases when duplicates are found and merged)
+	int occurrences;
+	
+	float *rSquaredVec; // n by 1
+	
 	float *coefVec; // n by 1
 	float *resiVec; // m by 1
 	
@@ -89,8 +94,8 @@ public:
 	// count occurrences in model
 	void countOccurrences(Occurrence *occurrence);
 	
-	// check if the model is a duplicate
-	bool isDuplicate(Model *model);
+	// check if the model is a duplicate (and merge if requested)
+	bool isDuplicate(Model *model, bool merge);
 	
 	// destructor
 	~Model();

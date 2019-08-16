@@ -6,7 +6,11 @@ Model::Model(VectorXf *response, int maxTerms, CSMatrix *csMatrix) {
 	this->response = response;
 	this->maxTerms = maxTerms;
 	this->csMatrix = csMatrix;
+	this->occurrences = 1;
 	this->tests = response->getLength();
+	
+	// allocate memory for the r-squared contribution vector
+	rSquaredVec = new float[maxTerms];
 	
 	// allocate memory for the coefficients vector
 	coefVec = new float[maxTerms];
@@ -26,6 +30,8 @@ Model::Model(VectorXf *response, int maxTerms, CSMatrix *csMatrix) {
 	// this is a one line way to get the same intercept above
 	leastSquares();
 
+	// this should always be 0
+	rSquaredVec[0] = this->rSquared;
 }
 
 Model::Model(Model *model) {
@@ -34,7 +40,14 @@ Model::Model(Model *model) {
 	this->csMatrix = model->csMatrix;
 	this->rSquared = model->rSquared;
 	this->terms = model->terms;
+	this->occurrences = model->occurrences;
 	this->tests = response->getLength();
+	
+	// allocate memory for the r-squared contribution vector and copy
+	rSquaredVec = new float[maxTerms];
+	for (int rsq_i = 0; rsq_i < maxTerms; rsq_i++) {
+		rSquaredVec[rsq_i] = model->rSquaredVec[rsq_i];
+	}
 	
 	// allocate memory for the coefficients vector and copy
 	coefVec = new float[maxTerms];
@@ -72,8 +85,9 @@ void Model::printModelFactors() {
 	cout << "Model with " << terms << " terms" << endl;
 	
 	// print out the headers
-	cout << setw(15) << right << "Coefficient" << " | " << "Term" << endl;
+	cout << setw(15) << right << "R^2 Contr." << " | " << setw(15) << right << "Coefficient" << " | " << "Term" << endl;
 	cout << setw(15) << setfill('-') << "" << " | " <<
+			setw(15) << setfill('-') << "" << " | " <<
 			setw(15) << setfill('-') << "" << setfill(' ') << endl;
 	
 	// print out each term
@@ -81,6 +95,7 @@ void Model::printModelFactors() {
 	for (TermIndex *pTermIndex = hTermIndex; pTermIndex != NULL; pTermIndex = pTermIndex->next) {
 		// print out the coefficient
 		int termIndex = pTermIndex->termIndex;
+		cout << setw(15) << right << rSquaredVec[term_i] << " | ";
 		cout << setw(15) << right << coefVec[term_i++] << " | ";
 		
 		// print out the factor names and level names
@@ -93,6 +108,7 @@ void Model::printModelFactors() {
 	
 	// print model r-squared
 	if (rSquared == 1) cout << "Perfect Model!!!" << endl;
+	cout << "Occurrences: " << occurrences << endl;
 	cout << "R-Squared: " << rSquared << endl;
 	cout << "Adjusted R-Squared: " << adjustedRSquared << endl;
 }
@@ -321,38 +337,31 @@ bool Model::termExists(int col_i) {
 
 // add a term (col_i of csMatrix) to the model. Returns true if added successfully
 bool Model::addTerm(int col_i) {
+	TermIndex *termIndex = NULL;
 	
 	TermIndex **pTermIndex = &hTermIndex;
-	for (; *pTermIndex != NULL; pTermIndex = &(*pTermIndex)->next) {
+	for (; ; pTermIndex = &(*pTermIndex)->next) {
 		
-		if ((*pTermIndex)->termIndex == col_i) {
-			
-			// already exists so cannot insert
-			return false;
-			
-		} else if ((*pTermIndex)->termIndex > col_i) {
-			
-			// insert within the list
-			TermIndex *termIndex = new TermIndex;
+		if (*pTermIndex == NULL || (*pTermIndex)->termIndex > col_i) {
+			// insert within (or at the end of) the list
+			termIndex = new TermIndex;
 			termIndex->termIndex = col_i;
 			termIndex->next = (*pTermIndex);
 			(*pTermIndex) = termIndex;
 			terms++;
-			return true;
 			
+			// calculate r-squared contribution for this term
+			float oldRSquared = this->rSquared;
+			leastSquares();
+			rSquaredVec[terms - 1] = this->rSquared - oldRSquared;
+			
+			return true;
+		} else if ((*pTermIndex)->termIndex == col_i) {
+			// already exists so cannot insert
+			return false;
 		}
 		
 	}
-	
-	// create a new term index at the end
-	TermIndex *termIndex = new TermIndex;
-	termIndex->termIndex = col_i;
-	termIndex->next = NULL;
-	(*pTermIndex) = termIndex;
-	terms++;
-	
-	return true;
-	
 }
 
 // remove a term from the model
@@ -417,7 +426,7 @@ void Model::countOccurrences(Occurrence *occurrence) {
 	}
 }
 
-bool Model::isDuplicate(Model *model) {
+bool Model::isDuplicate(Model *model, bool merge) {
 	// check if all terms match
 	TermIndex *p1TermIndex = hTermIndex;
 	TermIndex *p2TermIndex = model->hTermIndex;
@@ -427,6 +436,15 @@ bool Model::isDuplicate(Model *model) {
 		
 		p1TermIndex = p1TermIndex->next;
 		p2TermIndex = p2TermIndex->next;
+	}
+	
+	// now merge the duplicate models if requested
+	if (merge) {
+		for (int rsq_i = 0; rsq_i < terms; rsq_i++) {
+			rSquaredVec[rsq_i] += model->rSquaredVec[rsq_i];
+		}
+		
+		this->occurrences += model->occurrences;
 	}
 	
 	return true;
@@ -440,6 +458,9 @@ Model::~Model() {
 		hTermIndex = hTermIndex->next;
 		delete removed;
 	}
+	
+	// delete r-squared contribution vector
+	delete[] rSquaredVec;
 	
 	// delete coefficients vector
 	delete[] coefVec;

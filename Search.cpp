@@ -318,12 +318,12 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				// mark the term as used
 				colDetails[bestCol_i].used = true;
 				
-				// add the term to the model temporarily
-				model->addTerm(bestCol_i);
-				model->leastSquares();
+				// create a new model and add the term to the model
+				Model *newModel = new Model(model);
+				newModel->addTerm(bestCol_i);
 				
 //				cout << "Ran least squares on:" << endl;
-//				model->printModelFactors();
+//				newModel->printModelFactors();
 //				cout << endl;
 				
 				// check if the model is a duplicate
@@ -331,8 +331,8 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				for (int model_i = 0; model_i < models_n; model_i++) {
 					if (nextTopModels[model_i] == NULL) {
 						break;
-					} else if (nextTopModels[model_i]->isDuplicate(model)) {
-						cout << "Duplicate Model!!!" << endl;
+					} else if (nextTopModels[model_i]->isDuplicate(newModel, true)) {
+						cout << "Duplicate Model!!! Merged!" << endl;
 						isDuplicate = true;
 						break;
 					}
@@ -341,7 +341,7 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 				if (!isDuplicate) {
 					// find a possible next top model to replace
 					if (nextTopModels[models_n - 1] == NULL ||
-						nextTopModels[models_n - 1]->getRSquared() < model->getRSquared()) {
+						nextTopModels[models_n - 1]->getRSquared() < newModel->getRSquared()) {
 						
 						// make sure we deallocate the older next top model
 						if (nextTopModels[models_n - 1] != NULL) {
@@ -350,7 +350,9 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 						}
 						
 						// insert the new next top model
-						nextTopModels[models_n - 1] = new Model(model);
+						nextTopModels[models_n - 1] = newModel;
+					} else {
+						delete newModel;
 					}
 					
 					// perform swapping to maintain sorted list
@@ -364,11 +366,9 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 						}
 					}
 					
+				} else {
+					delete newModel;
 				}
-				
-				// remove the temporarily added term
-				model->removeTerm(bestCol_i);
-				
 			}
 			
 			// delete the model from the top models queue since it has been processed
