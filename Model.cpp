@@ -353,7 +353,7 @@ bool Model::addTerm(int col_i) {
 			// calculate r-squared contribution for this term
 			float oldRSquared = this->rSquared;
 			leastSquares();
-			rSquaredVec[terms - 1] = this->rSquared - oldRSquared;
+			rSquaredVec[terms - 1] = this->occurrences * (this->rSquared - oldRSquared);
 			
 			return true;
 		} else if ((*pTermIndex)->termIndex == col_i) {
