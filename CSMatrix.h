@@ -152,7 +152,7 @@ public:
 	
 	void print();
 	
-	void countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude);
+	void countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude, float rSquared);
 	
 	void reorderRows(int k, int c);
 	void minCountCheck(CSCol **array, int c,

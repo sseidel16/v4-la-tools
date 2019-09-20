@@ -9,9 +9,6 @@ Model::Model(VectorXf *response, int maxTerms, CSMatrix *csMatrix) {
 	this->occurrences = 1;
 	this->tests = response->getLength();
 	
-	// allocate memory for the r-squared contribution vector
-	rSquaredVec = new float[maxTerms];
-	
 	// allocate memory for the coefficients vector
 	coefVec = new float[maxTerms];
 	
@@ -31,7 +28,7 @@ Model::Model(VectorXf *response, int maxTerms, CSMatrix *csMatrix) {
 	leastSquares();
 
 	// this should always be 0
-	rSquaredVec[0] = this->rSquared;
+	hTermIndex->rSquared = this->rSquared;
 }
 
 Model::Model(Model *model) {
@@ -42,12 +39,6 @@ Model::Model(Model *model) {
 	this->terms = model->terms;
 	this->occurrences = model->occurrences;
 	this->tests = response->getLength();
-	
-	// allocate memory for the r-squared contribution vector and copy
-	rSquaredVec = new float[maxTerms];
-	for (int rsq_i = 0; rsq_i < maxTerms; rsq_i++) {
-		rSquaredVec[rsq_i] = model->rSquaredVec[rsq_i];
-	}
 	
 	// allocate memory for the coefficients vector and copy
 	coefVec = new float[maxTerms];
@@ -73,6 +64,7 @@ Model::Model(Model *model) {
 			pTermIndex = pTermIndex->next) {
 		(*destTermIndex) = new TermIndex;
 		(*destTermIndex)->termIndex = pTermIndex->termIndex;
+		(*destTermIndex)->rSquared = pTermIndex->rSquared;
 		(*destTermIndex)->next = NULL;
 		destTermIndex = &(*destTermIndex)->next;
 	}
@@ -95,7 +87,7 @@ void Model::printModelFactors() {
 	for (TermIndex *pTermIndex = hTermIndex; pTermIndex != NULL; pTermIndex = pTermIndex->next) {
 		// print out the coefficient
 		int termIndex = pTermIndex->termIndex;
-		cout << setw(15) << right << rSquaredVec[term_i] << " | ";
+		cout << setw(15) << right << pTermIndex->rSquared << " | ";
 		cout << setw(15) << right << coefVec[term_i++] << " | ";
 		
 		// print out the factor names and level names
@@ -353,7 +345,7 @@ bool Model::addTerm(int col_i) {
 			// calculate r-squared contribution for this term
 			float oldRSquared = this->rSquared;
 			leastSquares();
-			rSquaredVec[terms - 1] = this->occurrences * (this->rSquared - oldRSquared);
+			termIndex->rSquared = this->occurrences * (this->rSquared - oldRSquared);
 			
 			return true;
 		} else if ((*pTermIndex)->termIndex == col_i) {
@@ -421,8 +413,9 @@ void Model::countOccurrences(Occurrence *occurrence) {
 	int term_i = 0;
 	for (TermIndex *pTermIndex = hTermIndex; pTermIndex != NULL; pTermIndex = pTermIndex->next) {
 		int termIndex = pTermIndex->termIndex;
+		float rSquared = pTermIndex->rSquared;
 		float magnitude = coefVec[term_i++];
-		csMatrix->countOccurrences(csMatrix->getCol(termIndex), occurrence, 0, magnitude);
+		csMatrix->countOccurrences(csMatrix->getCol(termIndex), occurrence, 0, magnitude, rSquared);
 	}
 }
 
@@ -440,8 +433,11 @@ bool Model::isDuplicate(Model *model, bool merge) {
 	
 	// now merge the duplicate models if requested
 	if (merge) {
-		for (int rsq_i = 0; rsq_i < terms; rsq_i++) {
-			rSquaredVec[rsq_i] += model->rSquaredVec[rsq_i];
+		p2TermIndex = model->hTermIndex;
+		for (p1TermIndex = hTermIndex; p1TermIndex != NULL; p1TermIndex = p1TermIndex->next) {
+			p1TermIndex->rSquared += p2TermIndex->rSquared;
+			
+			p2TermIndex = p2TermIndex->next;
 		}
 		
 		this->occurrences += model->occurrences;
@@ -458,9 +454,6 @@ Model::~Model() {
 		hTermIndex = hTermIndex->next;
 		delete removed;
 	}
-	
-	// delete r-squared contribution vector
-	delete[] rSquaredVec;
 	
 	// delete coefficients vector
 	delete[] coefVec;

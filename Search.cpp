@@ -169,7 +169,7 @@ void loadResponseVector(VectorXf *response, string directory, string column, boo
 
 // comparison, not case sensitive.
 bool compareOccurrence(const Occurrence *first, const Occurrence *second) {
-	return (first->count < second->count);
+	return (first->rSquaredContribution < second->rSquaredContribution);
 }
 
 void allocateOccurrences(Occurrence *occurrence, int t, int factors, list<Occurrence*> *occurrenceLists) {
@@ -187,6 +187,7 @@ void allocateOccurrences(Occurrence *occurrence, int t, int factors, list<Occurr
 		// initialize occurrence
 		occurrence->list[factor_i].factorList = new int[occurrence->factorList_n + 1];
 		occurrence->list[factor_i].factorList_n = occurrence->factorList_n + 1;
+		occurrence->list[factor_i].rSquaredContribution = 0;
 		occurrence->list[factor_i].count = 0;
 		occurrence->list[factor_i].magnitude = 0;
 		
@@ -397,6 +398,7 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 	Occurrence *occurrence = new Occurrence;
 	occurrence->factorList = new int[0];
 	occurrence->factorList_n = 0;
+	occurrence->rSquaredContribution = 0;
 	occurrence->count = 0;
 	occurrence->magnitude = 0;
 	list<Occurrence*> *occurrenceLists = new list<Occurrence*>[locatingArray->getT()];
@@ -426,8 +428,11 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 		occurrenceLists[t].reverse();
 		
 		// print out the headers
-		cout << setw(10) << right << "Count" << " | " << setw(15) << "Magnitude" << " | " << "Factor Combination" << endl;
-		cout << setw(10) << setfill('-') << "" << " | " <<
+		cout << right << setw(15) << "R^2 Contr." << " | " <<
+		                 setw(15) << "Count" << " | " <<
+				         setw(15) << "Magnitude" << " | " << "Factor Combination" << endl;
+		cout << setw(15) << setfill('-') << "" << " | " <<
+				setw(15) << setfill('-') << "" << " | " <<
 				setw(15) << setfill('-') << "" << " | " <<
 				setw(20) << setfill('-') << "" << setfill(' ') << endl;
 		
@@ -436,7 +441,8 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 			
 			// only print the count if it has a count
 			if ((*it)->count > 0) {
-				cout << setw(10) << right << (*it)->count << " | ";
+				cout << setw(15) << right << (*it)->rSquaredContribution << " | ";
+				cout << setw(15) << right << (*it)->count << " | ";
 				cout << setw(15) << right << (*it)->magnitude << " | ";
 				
 				// print out the factor combination names

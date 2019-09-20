@@ -1234,14 +1234,18 @@ void CSMatrix::print() {
 	
 }
 
-void CSMatrix::countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude) {
+void CSMatrix::countOccurrences(CSCol *csCol, Occurrence *occurrence, int minSetting_i, float magnitude, float rSquared) {
+	if (occurrence->factorList_n == csCol->factors) {
+		occurrence->rSquaredContribution += rSquared;
+	}
+	
 	if (occurrence->list == NULL) return;
 	
 	for (int setting_i = minSetting_i; setting_i < csCol->factors; setting_i++) {
 		occurrence->list[csCol->setting[setting_i].factor_i].count++;
 		occurrence->list[csCol->setting[setting_i].factor_i].magnitude += abs(magnitude);
 		
-		countOccurrences(csCol, &occurrence->list[csCol->setting[setting_i].factor_i], setting_i + 1, magnitude);
+		countOccurrences(csCol, &occurrence->list[csCol->setting[setting_i].factor_i], setting_i + 1, magnitude, rSquared);
 	}
 }
 

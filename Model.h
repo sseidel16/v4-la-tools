@@ -21,6 +21,7 @@ typedef struct WorkSpace {
 
 typedef struct TermIndex {
 	int termIndex;
+	float rSquared;
 	struct TermIndex *next;
 } TermIndex;
 
@@ -51,8 +52,6 @@ private:
 	
 	// indicates the number of times this model occurs (increases when duplicates are found and merged)
 	int occurrences;
-	
-	float *rSquaredVec; // n by 1
 	
 	float *coefVec; // n by 1
 	float *resiVec; // m by 1

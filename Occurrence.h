@@ -10,6 +10,8 @@ struct Occurrence {
 	
 	float magnitude;
 	
+	float rSquaredContribution;
+	
 	Occurrence *list;
 	
 };
