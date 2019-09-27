@@ -402,6 +402,7 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 	occurrence->count = 0;
 	occurrence->magnitude = 0;
 	list<Occurrence*> *occurrenceLists = new list<Occurrence*>[locatingArray->getT()];
+	list<Occurrence*> *occurrenceList = new list<Occurrence*>;
 	allocateOccurrences(occurrence, locatingArray->getT(), locatingArray->getFactors(), occurrenceLists);
 	
 	cout << endl;
@@ -423,11 +424,49 @@ void createModels(LocatingArray *locatingArray, VectorXf *response, CSMatrix *cs
 	// sort number of occurrences and print
 	cout << "Occurrence Counts" << endl;
 	for (int t = 0; t < locatingArray->getT(); t++) {
+		occurrenceList->insert(occurrenceList->begin(), occurrenceLists[t].begin(), occurrenceLists[t].end());
+	}
+	occurrenceList->sort(compareOccurrence);
+	occurrenceList->reverse();
+	
+	// print out the headers
+	cout << "All Occurrences Table" << endl;
+	cout << right << setw(15) << "R^2 Contr." << " | " <<
+						setw(15) << "Count" << " | " <<
+						setw(15) << "Magnitude" << " | " << "Factor Combination" << endl;
+	cout << setw(15) << setfill('-') << "" << " | " <<
+			setw(15) << setfill('-') << "" << " | " <<
+			setw(15) << setfill('-') << "" << " | " <<
+			setw(20) << setfill('-') << "" << setfill(' ') << endl;
+	
+	// print out each count
+	for (std::list<Occurrence*>::iterator it = occurrenceList->begin(); it != occurrenceList->end(); it++) {
+		
+		// only print the count if it has a count
+		if ((*it)->count > 0) {
+			cout << setw(15) << right << (*it)->rSquaredContribution << " | ";
+			cout << setw(15) << right << (*it)->count << " | ";
+			cout << setw(15) << right << (*it)->magnitude << " | ";
+			
+			// print out the factor combination names
+			for (int factorList_i = 0; factorList_i < (*it)->factorList_n; factorList_i++) {
+				if (factorList_i != 0) cout << " & ";
+				cout << locatingArray->getFactorData()->getFactorName((*it)->factorList[factorList_i]);
+			}
+			cout << endl;
+		}
+		
+	}
+	
+	cout << endl;
+
+	for (int t = 0; t < locatingArray->getT(); t++) {
 		
 		occurrenceLists[t].sort(compareOccurrence);
 		occurrenceLists[t].reverse();
 		
 		// print out the headers
+		cout << "Occurrences Table (t=" << t + 1 << ")" << endl;
 		cout << right << setw(15) << "R^2 Contr." << " | " <<
 		                 setw(15) << "Count" << " | " <<
 				         setw(15) << "Magnitude" << " | " << "Factor Combination" << endl;
